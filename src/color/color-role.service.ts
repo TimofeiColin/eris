@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GuildMember, PermissionFlagsBits, Role } from 'discord.js';
+import { Guild, GuildMember, PermissionFlagsBits, Role } from 'discord.js';
 import { DISCORD_COLORS, DiscordColor } from './colors';
 
 const COLOR_ROLE_PREFIX = 'Color ';
@@ -24,22 +24,7 @@ export class ColorRoleService {
       return '❌ I need the **Manage Roles** permission to change colors.';
     }
 
-    await report(`🔍 Checking if the **${roleName}** role exists...`);
-
-    let role = guild.roles.cache.find(({ name }) => name === roleName);
-
-    if (!role) {
-      await report(`🛠️ Creating the **${roleName}** role...`);
-
-      role = await guild.roles.create({
-        name: roleName,
-        colors: { primaryColor: color.value },
-        permissions: [],
-        reason: 'Create color role',
-      });
-
-      await this.moveBelowBot(role, report);
-    }
+    const { role } = await this.ensureRole(guild, color, report);
 
     const otherColorRoles = member.roles.cache.filter(({ id, name }) => id !== role.id && COLOR_ROLE_NAMES.has(name));
 
@@ -56,6 +41,16 @@ export class ColorRoleService {
     }
 
     return `✅ Your name color is now **${color.name}**!`;
+  }
+
+  async createColorRole(guild: Guild, color: DiscordColor, report: (step: string) => Promise<void>) {
+    if (!guild.members.me?.permissions.has(PermissionFlagsBits.ManageRoles)) {
+      return '❌ I need the **Manage Roles** permission to create color roles.';
+    }
+
+    const { role, created } = await this.ensureRole(guild, color, report);
+
+    return created ? `✅ Created the **${role.name}** role.` : `ℹ️ The **${role.name}** role already exists.`;
   }
 
   async clearColors(member: GuildMember, report: (step: string) => Promise<void>) {
@@ -80,6 +75,31 @@ export class ColorRoleService {
     await member.roles.remove(colorRoles, 'Member cleared name colors');
 
     return `✅ Removed your color roles: ${colorNames}.`;
+  }
+
+  private async ensureRole(guild: Guild, color: DiscordColor, report: (step: string) => Promise<void>) {
+    const roleName = colorRoleName(color);
+
+    await report(`🔍 Checking if the **${roleName}** role exists...`);
+
+    const existingRole = guild.roles.cache.find(({ name }) => name === roleName);
+
+    if (existingRole) {
+      return { role: existingRole, created: false };
+    }
+
+    await report(`🛠️ Creating the **${roleName}** role...`);
+
+    const role = await guild.roles.create({
+      name: roleName,
+      colors: { primaryColor: color.value },
+      permissions: [],
+      reason: 'Create color role',
+    });
+
+    await this.moveBelowBot(role, report);
+
+    return { role, created: true };
   }
 
   private async moveBelowBot(role: Role, report: (step: string) => Promise<void>) {

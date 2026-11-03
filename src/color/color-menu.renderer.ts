@@ -11,6 +11,8 @@ import {
 
 const COLORS_PER_PAGE = 6;
 
+export type ColorMenuMode = 'apply' | 'create';
+
 export const getPageCount = ({ colors }: DiscordColorGroup) => Math.ceil(colors.length / COLORS_PER_PAGE);
 
 const renderGroupMenu = (selected?: DiscordColorGroup) =>
@@ -29,7 +31,7 @@ const renderGroupMenu = (selected?: DiscordColorGroup) =>
       ),
   );
 
-const renderButtons = (page = 0, pageCount = 0) => {
+const renderButtons = (mode: ColorMenuMode, page = 0, pageCount = 0) => {
   const randomButton = new ButtonBuilder()
     .setCustomId('random-color')
     .setLabel('Random')
@@ -42,8 +44,10 @@ const renderButtons = (page = 0, pageCount = 0) => {
     .setEmoji('✖️')
     .setStyle(ButtonStyle.Danger);
 
+  const extraButtons = mode === 'apply' ? [randomButton, closeButton] : [closeButton];
+
   if (!pageCount) {
-    return new ActionRowBuilder<ButtonBuilder>().addComponents(randomButton, closeButton);
+    return new ActionRowBuilder<ButtonBuilder>().addComponents(...extraButtons);
   }
 
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -57,30 +61,31 @@ const renderButtons = (page = 0, pageCount = 0) => {
       .setEmoji('▶️')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(page === pageCount - 1),
-    randomButton,
-    closeButton,
+    ...extraButtons,
   );
 };
 
-export const renderIntro = (currentColor?: DiscordColor) => {
+export const renderIntro = (mode: ColorMenuMode, currentColor?: DiscordColor) => {
   const currentColorText = currentColor
     ? `Your current color is **${currentColor.name}**.`
     : "You don't have a color yet.";
 
-  return {
-    embeds: [
-      new EmbedBuilder()
-        .setTitle('🎨 Colors')
-        .setDescription(
-          `${currentColorText}\n\nChoose a group below to see its colors. There are ${DISCORD_COLORS.length} in total.`,
-        )
-        .setColor(currentColor?.value ?? null),
-    ],
-    components: [renderGroupMenu(), renderButtons()],
-  };
+  const embed =
+    mode === 'apply'
+      ? new EmbedBuilder()
+          .setTitle('🎨 Colors')
+          .setDescription(
+            `${currentColorText}\n\nChoose a group below to see its colors. There are ${DISCORD_COLORS.length} in total.`,
+          )
+          .setColor(currentColor?.value ?? null)
+      : new EmbedBuilder()
+          .setTitle('🛠️ Create color roles')
+          .setDescription('Choose a group below, then pick a color to create its role.');
+
+  return { embeds: [embed], components: [renderGroupMenu(), renderButtons(mode)] };
 };
 
-export const renderGroupPage = (group: DiscordColorGroup, page: number) => {
+export const renderGroupPage = (mode: ColorMenuMode, group: DiscordColorGroup, page: number) => {
   const { name, emoji, colors } = group;
   const pageCount = getPageCount(group);
   const pageColors = colors.slice(page * COLORS_PER_PAGE, (page + 1) * COLORS_PER_PAGE);
@@ -95,7 +100,7 @@ export const renderGroupPage = (group: DiscordColorGroup, page: number) => {
   const colorMenu = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId('pick-color')
-      .setPlaceholder('Choose a color for yourself')
+      .setPlaceholder(mode === 'apply' ? 'Choose a color for yourself' : 'Choose a color role to create')
       .addOptions(
         pageColors.map((color) => ({
           label: color.name,
@@ -108,7 +113,7 @@ export const renderGroupPage = (group: DiscordColorGroup, page: number) => {
 
   return {
     embeds: [embed],
-    components: [renderGroupMenu(group), colorMenu, renderButtons(page, pageCount)],
+    components: [renderGroupMenu(group), colorMenu, renderButtons(mode, page, pageCount)],
     files: [card],
     attachments: [],
   };

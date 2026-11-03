@@ -4,14 +4,15 @@ A Discord bot that lets server members choose their name color from 148 colors, 
 
 ## Commands
 
-| Command        | What it does                                                                    |
-| -------------- | ------------------------------------------------------------------------------- |
-| `/color-list`  | Browse the colors by group, see them as real swatches and pick one for yourself |
-| `/color-reset` | Remove all of your color roles                                                  |
-| `/help`        | Show all available commands                                                     |
-| `/ping`        | Check that the bot is responding                                                |
+| Command         | What it does                                                                    |
+| --------------- | ------------------------------------------------------------------------------- |
+| `/color-list`   | Browse the colors by group, see them as real swatches and pick one for yourself |
+| `/color-create` | Browse the colors and create roles for them, without assigning them             |
+| `/color-reset`  | Remove all of your color roles                                                  |
+| `/help`         | Show all available commands                                                     |
+| `/ping`         | Check that the bot is responding                                                |
 
-`/color-list` and `/color-reset` only work in servers. All replies about colors are visible only to the person who used the command.
+The color commands only work in servers. All replies about colors are visible only to the person who used the command.
 
 ### Choosing a color
 

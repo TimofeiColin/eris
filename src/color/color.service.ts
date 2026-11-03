@@ -1,7 +1,7 @@
 import { DISCORD_COLOR_GROUPS, DISCORD_COLORS, DiscordColor } from './colors';
 import { ColorRoleService } from './color-role.service';
 import { Injectable, Logger } from '@nestjs/common';
-import { getPageCount, renderGroupPage, renderIntro } from './color-menu.renderer';
+import { ColorMenuMode, getPageCount, renderGroupPage, renderIntro } from './color-menu.renderer';
 import { DiscordCommand } from '../discord/discord-command';
 import {
   ChatInputCommandInteraction,
@@ -24,7 +24,14 @@ export class ColorService {
         .setName('color-list')
         .setDescription('Browse all available colors by group')
         .setContexts(InteractionContextType.Guild),
-      execute: (interaction) => this.showColors(interaction),
+      execute: (interaction) => this.showColors(interaction, 'apply'),
+    },
+    {
+      data: new SlashCommandBuilder()
+        .setName('color-create')
+        .setDescription('Create color roles from the color list')
+        .setContexts(InteractionContextType.Guild),
+      execute: (interaction) => this.showColors(interaction, 'create'),
     },
     {
       data: new SlashCommandBuilder()
@@ -37,11 +44,11 @@ export class ColorService {
 
   constructor(private readonly colorRole: ColorRoleService) {}
 
-  private async showColors(interaction: ChatInputCommandInteraction) {
+  private async showColors(interaction: ChatInputCommandInteraction, mode: ColorMenuMode) {
     const currentColor = interaction.inCachedGuild() ? this.colorRole.getCurrentColor(interaction.member) : undefined;
 
     const response = await interaction.reply({
-      ...renderIntro(currentColor),
+      ...renderIntro(mode, currentColor),
       flags: MessageFlags.Ephemeral,
       withResponse: true,
     });
@@ -71,7 +78,7 @@ export class ColorService {
 
       if (chosenColor) {
         collector.stop('closed');
-        this.pickColor(component, chosenColor).catch(this.logError);
+        this.runColorAction(component, chosenColor, mode).catch(this.logError);
 
         return;
       }
@@ -87,7 +94,7 @@ export class ColorService {
       }
 
       try {
-        component.update(renderGroupPage(group, page)).catch(this.logError);
+        component.update(renderGroupPage(mode, group, page)).catch(this.logError);
       } catch (error) {
         this.logError(error as Error);
       }
@@ -121,7 +128,7 @@ export class ColorService {
     }
   }
 
-  private async pickColor(component: MessageComponentInteraction, color: DiscordColor) {
+  private async runColorAction(component: MessageComponentInteraction, color: DiscordColor, mode: ColorMenuMode) {
     await component.update({ content: '⏳ Starting...', embeds: [], components: [], attachments: [] });
 
     const report = async (content: string) => {
@@ -129,16 +136,20 @@ export class ColorService {
     };
 
     if (!component.inCachedGuild()) {
-      await report('❌ Colors can only be chosen inside a server.');
+      await report('❌ Colors can only be managed inside a server.');
 
       return;
     }
 
     try {
-      await report(await this.colorRole.applyColor(component.member, color, report));
+      const result =
+        mode === 'apply'
+          ? await this.colorRole.applyColor(component.member, color, report)
+          : await this.colorRole.createColorRole(component.guild, color, report);
+      await report(result);
     } catch (error) {
       this.logError(error as Error);
-      await report('❌ Something went wrong while changing your color, please try again.');
+      await report('❌ Something went wrong, please try again.');
     }
   }
 }
