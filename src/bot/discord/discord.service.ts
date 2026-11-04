@@ -1,27 +1,22 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Client, Events, GatewayIntentBits, Interaction, MessageFlags, RESTEvents } from 'discord.js';
+
+import { createErrorLogger } from '../../common/create-error-logger';
+import type { EnvConfig } from '../../env.validation';
 import { ColorService } from '../color/color.service';
 import { HelpService } from '../help/help.service';
 import { PingService } from '../ping/ping.service';
-import { ConfigService } from '@nestjs/config';
 import { findRequiredBotChannel } from './bot-channel.guard';
+import { areCommandsRegistered, toCommandData } from './command-registration';
 import { DiscordCommand } from './discord-command';
-import {
-  ApplicationCommandData,
-  ApplicationIntegrationType,
-  Client,
-  Events,
-  GatewayIntentBits,
-  Interaction,
-  MessageFlags,
-  RESTEvents,
-} from 'discord.js';
 
 const MAX_RATE_LIMIT_WAIT = 60 * 1000;
 
 @Injectable()
 export class DiscordService implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(DiscordService.name);
-  private readonly logError = (error: Error) => this.logger.error(error.message, error.stack);
+  private readonly logError = createErrorLogger(this.logger);
 
   private readonly client = new Client({
     intents: [GatewayIntentBits.Guilds],
@@ -31,13 +26,12 @@ export class DiscordService implements OnApplicationBootstrap, OnApplicationShut
   private readonly commands: DiscordCommand[];
 
   constructor(
-    private readonly config: ConfigService,
+    private readonly config: ConfigService<EnvConfig, true>,
     helpService: HelpService,
     pingService: PingService,
     colorService: ColorService,
   ) {
     this.commands = [...helpService.commands, ...pingService.commands, ...colorService.commands];
-    this.commands.forEach(({ data }) => data.setIntegrationTypes(ApplicationIntegrationType.GuildInstall));
   }
 
   async onApplicationBootstrap() {
@@ -56,7 +50,7 @@ export class DiscordService implements OnApplicationBootstrap, OnApplicationShut
       this.handleInteraction(interaction).catch(this.logError);
     });
 
-    await this.client.login(this.config.getOrThrow<string>('DISCORD_TOKEN'));
+    await this.client.login(this.config.getOrThrow('DISCORD_TOKEN', { infer: true }));
   }
 
   async onApplicationShutdown() {
@@ -68,7 +62,7 @@ export class DiscordService implements OnApplicationBootstrap, OnApplicationShut
       return;
     }
 
-    const botChannel = findRequiredBotChannel(interaction);
+    const botChannel = findRequiredBotChannel(interaction, this.config.getOrThrow('BOT_CHANNEL_NAME', { infer: true }));
 
     if (botChannel) {
       await interaction.reply({
@@ -84,18 +78,10 @@ export class DiscordService implements OnApplicationBootstrap, OnApplicationShut
   }
 
   private async registerCommands(client: Client<true>) {
-    const commands = this.commands.map(
-      ({ data }) =>
-        JSON.parse(
-          JSON.stringify(data, (_, value: unknown) => (Array.isArray(value) && !value.length ? undefined : value)),
-        ) as ApplicationCommandData,
-    );
+    const commands = this.commands.map(({ data }) => toCommandData(data));
     const registered = await client.application.commands.fetch();
-    const isUpToDate =
-      registered.size === commands.length &&
-      commands.every((command) => registered.find(({ name }) => name === command.name)?.equals(command));
 
-    if (isUpToDate) {
+    if (areCommandsRegistered([...registered.values()], commands)) {
       return;
     }
 

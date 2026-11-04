@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { ChatInputCommandInteraction, EmbedBuilder, MessageFlags, SlashCommandBuilder } from 'discord.js';
-import { DiscordCommand } from '../discord/discord-command';
+import { ChatInputCommandInteraction, EmbedBuilder, MessageFlags } from 'discord.js';
+
+import { createSlashCommand, DiscordCommand } from '../discord/discord-command';
 
 const HELP_COLOR = 0x5865f2;
 
@@ -8,7 +9,7 @@ const HELP_COLOR = 0x5865f2;
 export class HelpService {
   readonly commands: DiscordCommand[] = [
     {
-      data: new SlashCommandBuilder().setName('help').setDescription('Show all available commands'),
+      data: createSlashCommand().setName('help').setDescription('Show all available commands'),
       execute: (interaction, commands) => this.help(interaction, commands),
     },
   ];

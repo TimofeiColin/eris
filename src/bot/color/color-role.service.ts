@@ -1,24 +1,36 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Guild, GuildMember, PermissionFlagsBits, Role } from 'discord.js';
-import { DISCORD_COLORS, DiscordColor } from './colors';
 
-const COLOR_ROLE_PREFIX = 'Color ';
-
-const colorRoleName = ({ name }: DiscordColor) => `${COLOR_ROLE_PREFIX}${name}`;
-
-const COLOR_ROLE_NAMES = new Set(DISCORD_COLORS.map(colorRoleName));
+import type { EnvConfig } from '../../env.validation';
+import { ColorCatalogService } from './color-catalog.service';
+import { createColorRoleNaming } from './helpers';
+import { ColorOption } from './types';
 
 @Injectable()
 export class ColorRoleService {
   private readonly logger = new Logger(ColorRoleService.name);
 
-  getCurrentColor(member: GuildMember) {
-    return DISCORD_COLORS.find((color) => member.roles.cache.some(({ name }) => name === colorRoleName(color)));
+  private readonly naming: ReturnType<typeof createColorRoleNaming>;
+
+  constructor(
+    config: ConfigService<EnvConfig, true>,
+    private readonly colorCatalog: ColorCatalogService,
+  ) {
+    this.naming = createColorRoleNaming(config.getOrThrow('COLOR_ROLE_PREFIX', { infer: true }));
   }
 
-  async applyColor(member: GuildMember, color: DiscordColor, report: (step: string) => Promise<void>) {
+  async getCurrentColor(member: GuildMember) {
+    const colorNames = member.roles.cache
+      .map(({ name }) => this.naming.colorNameFromRole(name))
+      .filter((name) => name !== undefined);
+
+    return this.colorCatalog.findColorByNames(colorNames);
+  }
+
+  async applyColor(member: GuildMember, color: ColorOption, report: (step: string) => Promise<void>) {
     const { guild } = member;
-    const roleName = colorRoleName(color);
+    const roleName = this.naming.colorRoleName(color.name);
 
     if (!guild.members.me?.permissions.has(PermissionFlagsBits.ManageRoles)) {
       return '❌ I need the **Manage Roles** permission to change colors.';
@@ -26,7 +38,9 @@ export class ColorRoleService {
 
     const { role } = await this.ensureRole(guild, color, report);
 
-    const otherColorRoles = member.roles.cache.filter(({ id, name }) => id !== role.id && COLOR_ROLE_NAMES.has(name));
+    const otherColorRoles = member.roles.cache.filter(
+      ({ id, name }) => id !== role.id && this.naming.isColorRole(name),
+    );
 
     if ([role, ...otherColorRoles.values()].some(({ editable }) => !editable)) {
       return '❌ I am not allowed to change your color roles, my role must be above them.';
@@ -43,7 +57,7 @@ export class ColorRoleService {
     return `✅ Your name color is now **${color.name}**!`;
   }
 
-  async createColorRole(guild: Guild, color: DiscordColor, report: (step: string) => Promise<void>) {
+  async createColorRole(guild: Guild, color: ColorOption, report: (step: string) => Promise<void>) {
     if (!guild.members.me?.permissions.has(PermissionFlagsBits.ManageRoles)) {
       return '❌ I need the **Manage Roles** permission to create color roles.';
     }
@@ -60,7 +74,7 @@ export class ColorRoleService {
 
     await report('🔍 Checking your color roles...');
 
-    const colorRoles = member.roles.cache.filter(({ name }) => COLOR_ROLE_NAMES.has(name));
+    const colorRoles = member.roles.cache.filter(({ name }) => this.naming.isColorRole(name));
     const colorNames = colorRoles.map(({ name }) => name).join(', ');
 
     if (!colorRoles.size) {
@@ -77,8 +91,8 @@ export class ColorRoleService {
     return `✅ Removed your color roles: ${colorNames}.`;
   }
 
-  private async ensureRole(guild: Guild, color: DiscordColor, report: (step: string) => Promise<void>) {
-    const roleName = colorRoleName(color);
+  private async ensureRole(guild: Guild, color: ColorOption, report: (step: string) => Promise<void>) {
+    const roleName = this.naming.colorRoleName(color.name);
 
     await report(`🔍 Checking if the **${roleName}** role exists...`);
 

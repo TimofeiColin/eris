@@ -1,5 +1,3 @@
-import { DISCORD_COLOR_GROUPS, DISCORD_COLORS, DiscordColor, DiscordColorGroup } from './colors';
-import { renderColorCard } from './color-card';
 import {
   ActionRowBuilder,
   AttachmentBuilder,
@@ -9,23 +7,22 @@ import {
   StringSelectMenuBuilder,
 } from 'discord.js';
 
-const COLORS_PER_PAGE = 6;
+import { ColorGroupView, ColorMenuMode, ColorOption } from '../types';
+import { renderColorCard } from './color-card';
 
-export type ColorMenuMode = 'apply' | 'create';
+export const getPageCount = ({ colors }: ColorGroupView, colorsPerPage: number) =>
+  Math.ceil(colors.length / colorsPerPage);
 
-export const getPageCount = ({ colors }: DiscordColorGroup) => Math.ceil(colors.length / COLORS_PER_PAGE);
-
-const renderGroupMenu = (selected?: DiscordColorGroup) =>
+const renderGroupMenu = (groups: ColorGroupView[], selected?: ColorGroupView) =>
   new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId('color-group')
       .setPlaceholder('Choose a color group')
       .addOptions(
-        DISCORD_COLOR_GROUPS.map((group) => ({
+        groups.map((group) => ({
           label: group.name,
           value: group.name,
           description: `${group.colors.length} colors`,
-          emoji: { name: group.emoji },
           default: group === selected,
         })),
       ),
@@ -65,7 +62,8 @@ const renderButtons = (mode: ColorMenuMode, page = 0, pageCount = 0) => {
   );
 };
 
-export const renderIntro = (mode: ColorMenuMode, currentColor?: DiscordColor) => {
+export const renderIntro = (mode: ColorMenuMode, groups: ColorGroupView[], currentColor?: ColorOption) => {
+  const colorCount = groups.reduce((total, { colors }) => total + colors.length, 0);
   const currentColorText = currentColor
     ? `Your current color is **${currentColor.name}**.`
     : "You don't have a color yet.";
@@ -75,24 +73,30 @@ export const renderIntro = (mode: ColorMenuMode, currentColor?: DiscordColor) =>
       ? new EmbedBuilder()
           .setTitle('🎨 Colors')
           .setDescription(
-            `${currentColorText}\n\nChoose a group below to see its colors. There are ${DISCORD_COLORS.length} in total.`,
+            `${currentColorText}\n\nChoose a group below to see its colors. There are ${colorCount} in total.`,
           )
           .setColor(currentColor?.value ?? null)
       : new EmbedBuilder()
           .setTitle('🛠️ Create color roles')
           .setDescription('Choose a group below, then pick a color to create its role.');
 
-  return { embeds: [embed], components: [renderGroupMenu(), renderButtons(mode)] };
+  return { embeds: [embed], components: [renderGroupMenu(groups), renderButtons(mode)] };
 };
 
-export const renderGroupPage = (mode: ColorMenuMode, group: DiscordColorGroup, page: number) => {
-  const { name, emoji, colors } = group;
-  const pageCount = getPageCount(group);
-  const pageColors = colors.slice(page * COLORS_PER_PAGE, (page + 1) * COLORS_PER_PAGE);
+export const renderGroupPage = (
+  mode: ColorMenuMode,
+  groups: ColorGroupView[],
+  group: ColorGroupView,
+  page: number,
+  colorsPerPage: number,
+) => {
+  const { name, colors } = group;
+  const pageCount = getPageCount(group, colorsPerPage);
+  const pageColors = colors.slice(page * colorsPerPage, (page + 1) * colorsPerPage);
   const card = new AttachmentBuilder(renderColorCard(pageColors), { name: 'colors.png' });
 
   const embed = new EmbedBuilder()
-    .setTitle(`${emoji} ${name}`)
+    .setTitle(name)
     .setImage('attachment://colors.png')
     .setColor(pageColors[0].value)
     .setFooter({ text: `Page ${page + 1}/${pageCount} • ${colors.length} colors` });
@@ -106,14 +110,13 @@ export const renderGroupPage = (mode: ColorMenuMode, group: DiscordColorGroup, p
           label: color.name,
           value: color.name,
           description: color.hex,
-          emoji: { name: emoji },
         })),
       ),
   );
 
   return {
     embeds: [embed],
-    components: [renderGroupMenu(group), colorMenu, renderButtons(mode, page, pageCount)],
+    components: [renderGroupMenu(groups, group), colorMenu, renderButtons(mode, page, pageCount)],
     files: [card],
     attachments: [],
   };

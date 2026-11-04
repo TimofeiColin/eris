@@ -1,5 +1,6 @@
 import { createCanvas } from '@napi-rs/canvas';
-import { DiscordColor } from './colors';
+
+import { ColorOption } from '../types';
 
 const ROW_WIDTH = 900;
 const ROW_HEIGHT = 80;
@@ -13,7 +14,7 @@ const isLight = (value: number) => {
   return 0.299 * red + 0.587 * green + 0.114 * blue > 140;
 };
 
-const drawColorCard = (colors: DiscordColor[]) => {
+const drawColorCard = (colors: ColorOption[]) => {
   const canvas = createCanvas(ROW_WIDTH + 2 * GAP, colors.length * (ROW_HEIGHT + GAP) + GAP);
   const context = canvas.getContext('2d');
 
@@ -40,7 +41,7 @@ const drawColorCard = (colors: DiscordColor[]) => {
   return canvas.toBuffer('image/png');
 };
 
-export const renderColorCard = (colors: DiscordColor[]) => {
+export const renderColorCard = (colors: ColorOption[]) => {
   const key = colors.map(({ name }) => name).join(',');
   const card = cardCache.get(key) ?? drawColorCard(colors);
   cardCache.set(key, card);

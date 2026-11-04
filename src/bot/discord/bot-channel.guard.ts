@@ -1,10 +1,12 @@
 import { ChatInputCommandInteraction } from 'discord.js';
 
-const BOT_CHANNEL_NAME = 'colors';
+export const findRequiredBotChannel = (interaction: ChatInputCommandInteraction, channelName: string) => {
+  if (!channelName) {
+    return undefined;
+  }
 
-export const findRequiredBotChannel = (interaction: ChatInputCommandInteraction) => {
   const botChannel = interaction.guild?.channels.cache.find(
-    (channel) => channel.name === BOT_CHANNEL_NAME && channel.isTextBased(),
+    (channel) => channel.name === channelName && channel.isTextBased(),
   );
 
   if (!botChannel) {

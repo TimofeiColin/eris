@@ -1,40 +1,42 @@
-import { DISCORD_COLOR_GROUPS, DISCORD_COLORS, DiscordColor } from './colors';
-import { ColorRoleService } from './color-role.service';
 import { Injectable, Logger } from '@nestjs/common';
-import { ColorMenuMode, getPageCount, renderGroupPage, renderIntro } from './color-menu.renderer';
-import { DiscordCommand } from '../discord/discord-command';
+import { ConfigService } from '@nestjs/config';
 import {
   ChatInputCommandInteraction,
   InteractionContextType,
   MessageComponentInteraction,
   MessageFlags,
-  SlashCommandBuilder,
 } from 'discord.js';
 
-const MENU_IDLE_TIMEOUT = 5 * 60 * 1000;
+import { createErrorLogger } from '../../common/create-error-logger';
+import type { EnvConfig } from '../../env.validation';
+import { createSlashCommand, DiscordCommand } from '../discord/discord-command';
+import { ColorCatalogService } from './color-catalog.service';
+import { ColorRoleService } from './color-role.service';
+import { getPageCount, renderGroupPage, renderIntro } from './render';
+import { ColorMenuMode, ColorOption } from './types';
 
 @Injectable()
 export class ColorService {
   private readonly logger = new Logger(ColorService.name);
-  private readonly logError = (error: Error) => this.logger.error(error.message, error.stack);
+  private readonly logError = createErrorLogger(this.logger);
 
   readonly commands: DiscordCommand[] = [
     {
-      data: new SlashCommandBuilder()
+      data: createSlashCommand()
         .setName('color-list')
         .setDescription('Browse all available colors by group')
         .setContexts(InteractionContextType.Guild),
       execute: (interaction) => this.showColors(interaction, 'apply'),
     },
     {
-      data: new SlashCommandBuilder()
+      data: createSlashCommand()
         .setName('color-create')
         .setDescription('Create color roles from the color list')
         .setContexts(InteractionContextType.Guild),
       execute: (interaction) => this.showColors(interaction, 'create'),
     },
     {
-      data: new SlashCommandBuilder()
+      data: createSlashCommand()
         .setName('color-reset')
         .setDescription('Remove all of your color roles')
         .setContexts(InteractionContextType.Guild),
@@ -42,22 +44,46 @@ export class ColorService {
     },
   ];
 
-  constructor(private readonly colorRole: ColorRoleService) {}
+  private readonly colorsPerPage: number;
+  private readonly colorMenuTimeoutMs: number;
+
+  constructor(
+    config: ConfigService<EnvConfig, true>,
+    private readonly colorRole: ColorRoleService,
+    private readonly colorCatalog: ColorCatalogService,
+  ) {
+    this.colorsPerPage = config.getOrThrow('COLORS_PER_PAGE', { infer: true });
+    this.colorMenuTimeoutMs = config.getOrThrow('COLOR_MENU_TIMEOUT_SECONDS', { infer: true }) * 1000;
+  }
 
   private async showColors(interaction: ChatInputCommandInteraction, mode: ColorMenuMode) {
-    const currentColor = interaction.inCachedGuild() ? this.colorRole.getCurrentColor(interaction.member) : undefined;
+    const groups = await this.colorCatalog.getGroupsWithColors();
+
+    if (!groups.length) {
+      await interaction.reply({ content: '❌ No colors are set up yet.', flags: MessageFlags.Ephemeral });
+
+      return;
+    }
+
+    const colors = groups.flatMap((group) => group.colors);
+
+    const currentColor = interaction.inCachedGuild()
+      ? await this.colorRole.getCurrentColor(interaction.member)
+      : undefined;
 
     const response = await interaction.reply({
-      ...renderIntro(mode, currentColor),
+      ...renderIntro(mode, groups, currentColor),
       flags: MessageFlags.Ephemeral,
       withResponse: true,
     });
 
-    let group = DISCORD_COLOR_GROUPS[0];
+    let group = groups[0];
     let page = 0;
     let latestInteraction: ChatInputCommandInteraction | MessageComponentInteraction = interaction;
 
-    const collector = response.resource?.message?.createMessageComponentCollector({ idle: MENU_IDLE_TIMEOUT });
+    const collector = response.resource?.message?.createMessageComponentCollector({
+      idle: this.colorMenuTimeoutMs,
+    });
 
     collector?.on('collect', (component) => {
       if (component.customId === 'close') {
@@ -71,9 +97,9 @@ export class ColorService {
 
       const chosenColor =
         component.customId === 'random-color'
-          ? DISCORD_COLORS[Math.floor(Math.random() * DISCORD_COLORS.length)]
+          ? colors[Math.floor(Math.random() * colors.length)]
           : component.isStringSelectMenu() && component.customId === 'pick-color'
-            ? DISCORD_COLORS.find(({ name }) => name === component.values[0])
+            ? colors.find(({ name }) => name === component.values[0])
             : undefined;
 
       if (chosenColor) {
@@ -86,15 +112,15 @@ export class ColorService {
       latestInteraction = component;
 
       if (component.isStringSelectMenu()) {
-        group = DISCORD_COLOR_GROUPS.find(({ name }) => name === component.values[0]) ?? group;
+        group = groups.find(({ name }) => name === component.values[0]) ?? group;
         page = 0;
       } else {
         const nextPage = page + (component.customId === 'next-page' ? 1 : -1);
-        page = Math.min(Math.max(nextPage, 0), getPageCount(group) - 1);
+        page = Math.min(Math.max(nextPage, 0), getPageCount(group, this.colorsPerPage) - 1);
       }
 
       try {
-        component.update(renderGroupPage(mode, group, page)).catch(this.logError);
+        component.update(renderGroupPage(mode, groups, group, page, this.colorsPerPage)).catch(this.logError);
       } catch (error) {
         this.logError(error as Error);
       }
@@ -128,7 +154,7 @@ export class ColorService {
     }
   }
 
-  private async runColorAction(component: MessageComponentInteraction, color: DiscordColor, mode: ColorMenuMode) {
+  private async runColorAction(component: MessageComponentInteraction, color: ColorOption, mode: ColorMenuMode) {
     await component.update({ content: '⏳ Starting...', embeds: [], components: [], attachments: [] });
 
     const report = async (content: string) => {
