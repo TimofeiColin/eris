@@ -1,6 +1,6 @@
 # Eris
 
-A Discord bot that lets server members choose their name color from 148 colors, grouped into 11 families. Built with NestJS and discord.js.
+A Discord bot that lets server members choose their name color from 148 colors, grouped into 11 families. Built with NestJS and discord.js. It also runs an HTTP API for managing the colors, see [API](#api).
 
 ## Commands
 
@@ -50,6 +50,9 @@ Requires Node.js 22.12 or newer.
    | ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
    | `DISCORD_TOKEN`              | The bot's token                                                                                                   |
    | `MONGODB_URI`                | MongoDB connection string, e.g. `mongodb://localhost:27017/eris`                                                  |
+   | `API_KEY`                    | Secret key for the API, sent as a Bearer token. Generate one with `openssl rand -hex 32`                          |
+   | `PORT`                       | Optional. Port the API listens on, from 1 to 65535, default `3000`                                                |
+   | `API_PREFIX`                 | Optional. Path every API route starts with, default `api`                                                         |
    | `BOT_CHANNEL_NAME`           | Optional. The channel the bot answers in, default `colors`. Leave it empty to answer everywhere                   |
    | `COLOR_ROLE_PREFIX`          | Optional. Start of every color role's name, default `Color `. Keep the quotes when it ends in a space: `"Color "` |
    | `COLORS_PER_PAGE`            | Optional. Colors on each menu page, from 1 to 25, default `6`                                                     |
@@ -64,6 +67,50 @@ Requires Node.js 22.12 or newer.
    ```
 
 The bot refuses to start if a required variable is missing. On startup it updates its slash commands, but only when they've changed.
+
+## API
+
+Alongside the Discord bot, Eris runs an HTTP API on `PORT` (default `3000`). Every route starts with `API_PREFIX` (default `api`), and the server accepts connections from your local network, not only from `localhost`.
+
+### Docs
+
+While you run `npm run start:dev`, interactive docs are at **http://localhost:3000/api/docs**, and the raw OpenAPI JSON at `/api/docs-json`. Click **Authorize**, paste your `API_KEY`, and you can try every route from the browser. The docs are only served when `NODE_ENV` is `development`, so they're off under Docker, pm2 and `npm run start`.
+
+### Authentication
+
+Every route needs your `API_KEY` as a Bearer token. A missing or wrong key returns `401`.
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" http://localhost:3000/api/dashboard-stats
+```
+
+### Endpoints
+
+| Endpoint                       | What it does                                                                                          |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `GET /api/dashboard-stats`     | Number of color groups and colors                                                                     |
+| `GET /api/color-groups`        | Color groups with their `_id`, `name` and `colorsCount`, 6 per page. Query: `page` (1 to 100), `name` |
+| `GET /api/color-group`         | `{ "exists": true }` if a group has exactly that name, in any case. Query: `name`                     |
+| `POST /api/color-groups`       | Creates a group. Body: `{ "name": "Neon" }`. `409` if the name is taken, in any case                  |
+| `PATCH /api/color-groups/:id`  | Renames a group. Body: `{ "name": "Neon" }`. `409` if another group has that name, in any case        |
+| `DELETE /api/color-groups/:id` | Deletes a group. `409` while the group still has colors                                               |
+| `GET /api/colors-by-group`     | The `_id` and `name` of every color in a group. Query: `groupId`                                      |
+
+`name` on `GET /api/color-groups` matches part of a name in any case, so `re` finds Red and Green. Its response is paginated:
+
+```json
+{
+  "page": 1,
+  "totalPages": 2,
+  "hasNextPage": true,
+  "hasPreviousPage": false,
+  "items": [{ "_id": 1, "name": "Red", "colorsCount": 9 }]
+}
+```
+
+Creating, renaming and deleting return `{ "message": "ok" }`. Invalid input returns `400` with a list of what's wrong, and an unknown group id returns `404`.
+
+Browser apps on other origins can call the API, because CORS is enabled for all origins. The API key still protects every route.
 
 ## Roles
 
@@ -89,7 +136,7 @@ To add one, create a file in `src/database/migrations/` or `src/database/seeds/`
 
 ## Docker
 
-`docker-compose.yml` runs the bot together with its own MongoDB, so you only need `DISCORD_TOKEN` in `.env`:
+`docker-compose.yml` runs the bot together with its own MongoDB, so you only need `DISCORD_TOKEN` and `API_KEY` in `.env`:
 
 ```bash
 docker compose up -d mongo
@@ -97,7 +144,7 @@ docker compose run --rm bot node dist/database/cli seed
 docker compose up -d
 ```
 
-The first two commands start the database and fill it with the colors, which you only need to do once. The last one starts the bot.
+The first two commands start the database and fill it with the colors, which you only need to do once. The last one starts the bot. Its API is published on the `PORT` from `.env`, default `3000`, at `http://localhost:3000/api`. After pulling code changes, rebuild with `docker compose up -d --build`.
 
 These commands use Docker Compose v2, which comes with current Docker installs. If you have the older standalone version instead, write `docker-compose` with a hyphen, for example `docker-compose up -d`. Run `docker compose version` to check which you have. The database is kept in the `mongo-data` volume and isn't reachable from outside Docker, so it doesn't clash with a MongoDB already running on your machine.
 
@@ -130,7 +177,10 @@ npm run format
 | `src/bot/color`   | The color commands and menu, with `render/` for images and menu layout, `helpers/` for role names and `types/` for shared types |
 | `src/bot/ping`    | `/ping`                                                                                                                         |
 | `src/bot/help`    | `/help`                                                                                                                         |
-| `src/database`    | MongoDB connection, schemas, repositories, migrations and seeds                                                                 |
+| `src/api`         | The HTTP API, one folder per area with its controller, service, `dto/` for inputs and `api-responses/` for Swagger examples     |
+| `src/api/guards`  | The API key guard                                                                                                               |
+| `src/api/utils`   | Pagination helpers for building responses                                                                                       |
+| `src/database`    | MongoDB connection, schemas, repositories, migrations and seeds, with `utils/` for pagination queries                           |
 | `src/common`      | Small shared helpers                                                                                                            |
 
 Each feature service lists its own commands in a `commands` array, pairing each definition with its handler. To add a command, add an entry there, and register the service in `DiscordService` if it's new. `/help` picks it up automatically.
