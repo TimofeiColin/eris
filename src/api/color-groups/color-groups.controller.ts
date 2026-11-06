@@ -1,77 +1,71 @@
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  ParseIntPipe,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiConflictResponse, ApiNotFoundResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+  ApiBadRequestResponse,
+  ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 
-import { ApiKeyGuard } from '../guards/api-key.guard';
+import { ApiKeyAuth } from '../guards';
+import { okResponse } from '../swagger';
 import {
+  colorGroupHasColorsConflictResponse,
+  colorGroupIdOrNameBadRequestResponse,
+  colorGroupNameConflictResponse,
   colorGroupNotFoundResponse,
-  createColorGroupConflictResponse,
-  createColorGroupOkResponse,
-  deleteColorGroupConflictResponse,
-  deleteColorGroupOkResponse,
-  getColorGroupExistsOkResponse,
-  getColorGroupNamesOkResponse,
-  updateColorGroupConflictResponse,
-  updateColorGroupOkResponse,
+  getColorGroupOkResponse,
+  getColorGroupsNamesOkResponse,
+  getColorGroupsPaginatedOkResponse,
 } from './api-responses';
 import { ColorGroupsService } from './color-groups.service';
 import { CreateColorGroupDto, GetColorGroupQueryDto, GetColorGroupsQueryDto, UpdateColorGroupDto } from './dto';
 
 @ApiTags('Color Groups')
 @Controller()
-@UseGuards(ApiKeyGuard)
+@ApiKeyAuth()
 export class ColorGroupsController {
   constructor(private readonly colorGroupsService: ColorGroupsService) {}
 
-  @ApiBearerAuth()
   @Get('color-group')
-  @ApiOkResponse(getColorGroupExistsOkResponse)
-  colorGroupExists(@Query() query: GetColorGroupQueryDto) {
-    return this.colorGroupsService.colorGroupExists(query.name);
+  @ApiOkResponse(getColorGroupOkResponse)
+  @ApiBadRequestResponse(colorGroupIdOrNameBadRequestResponse)
+  getColorGroup(@Query() query: GetColorGroupQueryDto) {
+    return this.colorGroupsService.getColorGroup(query.id, query.name);
   }
 
-  @ApiBearerAuth()
   @Get('color-groups')
-  @ApiOkResponse(getColorGroupNamesOkResponse)
-  getColorGroupNames(@Query() query: GetColorGroupsQueryDto) {
-    return this.colorGroupsService.getColorGroupNames(query.page, query.name);
+  @ApiOkResponse(getColorGroupsPaginatedOkResponse)
+  getColorGroupsPaginated(@Query() query: GetColorGroupsQueryDto) {
+    return this.colorGroupsService.getColorGroupsPaginated(query.page, query.name);
   }
 
-  @ApiBearerAuth()
+  @Get('color-groups-names')
+  @ApiOkResponse(getColorGroupsNamesOkResponse)
+  getColorGroupsNames() {
+    return this.colorGroupsService.getColorGroupsNames();
+  }
+
   @Post('color-groups')
-  @HttpCode(HttpStatus.OK)
-  @ApiOkResponse(createColorGroupOkResponse)
-  @ApiConflictResponse(createColorGroupConflictResponse)
+  @ApiCreatedResponse(okResponse)
+  @ApiConflictResponse(colorGroupNameConflictResponse)
   createColorGroup(@Body() body: CreateColorGroupDto) {
     return this.colorGroupsService.createColorGroup(body.name);
   }
 
-  @ApiBearerAuth()
   @Patch('color-groups/:id')
-  @ApiOkResponse(updateColorGroupOkResponse)
+  @ApiOkResponse(okResponse)
   @ApiNotFoundResponse(colorGroupNotFoundResponse)
-  @ApiConflictResponse(updateColorGroupConflictResponse)
+  @ApiConflictResponse(colorGroupNameConflictResponse)
   updateColorGroup(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateColorGroupDto) {
     return this.colorGroupsService.updateColorGroup(id, body.name);
   }
 
-  @ApiBearerAuth()
   @Delete('color-groups/:id')
-  @ApiOkResponse(deleteColorGroupOkResponse)
+  @ApiOkResponse(okResponse)
   @ApiNotFoundResponse(colorGroupNotFoundResponse)
-  @ApiConflictResponse(deleteColorGroupConflictResponse)
+  @ApiConflictResponse(colorGroupHasColorsConflictResponse)
   deleteColorGroup(@Param('id', ParseIntPipe) id: number) {
     return this.colorGroupsService.deleteColorGroup(id);
   }

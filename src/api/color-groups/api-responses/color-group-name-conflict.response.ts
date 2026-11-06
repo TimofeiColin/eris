@@ -1,6 +1,6 @@
 import { ApiResponseOptions } from '@nestjs/swagger';
 
-export const createColorGroupConflictResponse: ApiResponseOptions = {
+export const colorGroupNameConflictResponse: ApiResponseOptions = {
   schema: {
     example: { message: 'Color group "Neon" already exists', error: 'Conflict', statusCode: 409 },
   },

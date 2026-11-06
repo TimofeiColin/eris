@@ -86,15 +86,21 @@ curl -H "Authorization: Bearer YOUR_API_KEY" http://localhost:3000/api/dashboard
 
 ### Endpoints
 
-| Endpoint                       | What it does                                                                                          |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `GET /api/dashboard-stats`     | Number of color groups and colors                                                                     |
-| `GET /api/color-groups`        | Color groups with their `_id`, `name` and `colorsCount`, 6 per page. Query: `page` (1 to 100), `name` |
-| `GET /api/color-group`         | `{ "exists": true }` if a group has exactly that name, in any case. Query: `name`                     |
-| `POST /api/color-groups`       | Creates a group. Body: `{ "name": "Neon" }`. `409` if the name is taken, in any case                  |
-| `PATCH /api/color-groups/:id`  | Renames a group. Body: `{ "name": "Neon" }`. `409` if another group has that name, in any case        |
-| `DELETE /api/color-groups/:id` | Deletes a group. `409` while the group still has colors                                               |
-| `GET /api/colors-by-group`     | The `_id` and `name` of every color in a group. Query: `groupId`                                      |
+| Endpoint                       | What it does                                                                                                                                                               |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/dashboard-stats`     | Number of color groups and colors                                                                                                                                          |
+| `GET /api/color-groups`        | Color groups with their `_id`, `name` and `colorsCount`, 6 per page. Query: `page` (1 to 100), `name`                                                                      |
+| `GET /api/color-groups-names`  | The `_id` and `name` of every color group, not paginated                                                                                                                   |
+| `GET /api/color-group`         | One group's `_id` and `name`. Query: either `id` or `name` (exact, any case). If none matches, `{ "message": "Color group … not found" }`                                  |
+| `POST /api/color-groups`       | Creates a group. Body: `{ "name": "Neon" }`. `409` if the name is taken, in any case                                                                                       |
+| `PATCH /api/color-groups/:id`  | Renames a group. Body: `{ "name": "Neon" }`. `409` if another group has that name, in any case                                                                             |
+| `DELETE /api/color-groups/:id` | Deletes a group. `409` while the group still has colors                                                                                                                    |
+| `GET /api/color`               | One color's `_id`, `name`, `hex` and `group`. Query: either `id` or `name` (exact, any case). If none matches, `{ "message": "Color … not found" }`                        |
+| `GET /api/colors`              | Colors with their `_id`, `name`, `hex`, `group` and `groupName`, 6 per page. Query: `page` (1 to 100), `name` (part of the name, any case), `groupId`                      |
+| `GET /api/colors-names`        | The `_id` and `name` of every color in a group. Query: `groupId`                                                                                                           |
+| `POST /api/colors`             | Creates a color. Body: `{ "name": "Neon Green", "hex": "#39FF14", "groupId": 4 }`, all required. `404` if the group doesn't exist, `409` if the name is taken, in any case |
+| `PATCH /api/colors/:id`        | Edits a color. Same body as create, all required. `409` if another color has that name, in any case                                                                        |
+| `DELETE /api/colors/:id`       | Deletes a color                                                                                                                                                            |
 
 `name` on `GET /api/color-groups` matches part of a name in any case, so `re` finds Red and Green. Its response is paginated:
 
@@ -108,7 +114,11 @@ curl -H "Authorization: Bearer YOUR_API_KEY" http://localhost:3000/api/dashboard
 }
 ```
 
-Creating, renaming and deleting return `{ "message": "ok" }`. Invalid input returns `400` with a list of what's wrong, and an unknown group id returns `404`.
+Creating returns `201` and editing or deleting returns `200`, all with `{ "message": "ok" }`. Invalid input returns `400` with what's wrong. An unknown group or color id returns `404`, except on `GET /api/color-group` and `GET /api/color`, which return a `"… not found"` message instead.
+
+Group names and color names are unique in any case, so `Red` and `red` can't both exist. The database enforces this too. Color names can be up to 90 characters, so they still fit in a Discord role name with the `Color ` prefix, and hex codes are saved in uppercase.
+
+Renaming or deleting a color through the API doesn't touch Discord. Members keep the role with the old name, and the bot no longer counts it as a color role. A deleted color's role stays in the server until you remove it.
 
 Browser apps on other origins can call the API, because CORS is enabled for all origins. The API key still protects every route.
 
@@ -131,6 +141,8 @@ Migrations and seeds are run with [umzug](https://github.com/sequelize/umzug). I
 | `npm run migrate:down` | Undoes the last migration                                                 |
 | `npm run seed`         | Runs pending migrations, then pending seeds (the color groups and colors) |
 | `npm run seed:down`    | Undoes the last seed                                                      |
+
+After pulling changes, run `npm run migrate` so existing databases get new migrations. Migrations 002 and 003 make group and color names unique in any case.
 
 To add one, create a file in `src/database/migrations/` or `src/database/seeds/` and add it to the list in that folder's `index.ts`. These commands need the dev dependencies. From a built copy, such as the Docker image, run `node dist/database/cli seed` instead.
 
@@ -177,11 +189,13 @@ npm run format
 | `src/bot/color`   | The color commands and menu, with `render/` for images and menu layout, `helpers/` for role names and `types/` for shared types |
 | `src/bot/ping`    | `/ping`                                                                                                                         |
 | `src/bot/help`    | `/help`                                                                                                                         |
-| `src/api`         | The HTTP API, one folder per area with its controller, service, `dto/` for inputs and `api-responses/` for Swagger examples     |
-| `src/api/guards`  | The API key guard                                                                                                               |
-| `src/api/utils`   | Pagination helpers for building responses                                                                                       |
-| `src/database`    | MongoDB connection, schemas, repositories, migrations and seeds, with `utils/` for pagination queries                           |
-| `src/common`      | Small shared helpers                                                                                                            |
+| `src/api`         | The HTTP API, one folder per area with its controller, service, `dto/` for inputs and `api-responses/` for its Swagger examples |
+| `src/api/swagger` | Swagger examples used by more than one area, like `{ "message": "ok" }`                                                         |
+| `src/api/common`  | Shared API settings, like page sizes                                                                                            |
+| `src/api/guards`  | The API key guard and the `@ApiKeyAuth()` decorator that adds it to a controller                                                |
+| `src/api/utils`   | Input helpers for DTOs, like `trimString`, `toNumber` and the `@IsHex()` check                                                  |
+| `src/database`    | MongoDB connection, schemas, repositories, migrations and seeds                                                                 |
+| `src/common`      | Small shared helpers, including pagination for the API and anything else that pages results                                     |
 
 Each feature service lists its own commands in a `commands` array, pairing each definition with its handler. To add a command, add an entry there, and register the service in `DiscordService` if it's new. `/help` picks it up automatically.
 

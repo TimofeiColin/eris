@@ -1,6 +1,6 @@
 import { ApiResponseOptions } from '@nestjs/swagger';
 
-export const deleteColorGroupOkResponse: ApiResponseOptions = {
+export const okResponse: ApiResponseOptions = {
   schema: {
     example: { message: 'ok' },
   },

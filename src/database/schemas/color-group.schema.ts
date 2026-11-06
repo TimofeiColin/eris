@@ -1,7 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 
-import { CASE_INSENSITIVE } from '../case-insensitive';
-
 @Schema({ collection: 'color_groups', versionKey: false })
 export class ColorGroup {
   @Prop({ type: Number, required: true })
@@ -13,4 +11,4 @@ export class ColorGroup {
 
 export const ColorGroupSchema = SchemaFactory.createForClass(ColorGroup);
 
-ColorGroupSchema.index({ name: 1 }, { unique: true, collation: CASE_INSENSITIVE });
+ColorGroupSchema.index({ name: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } });
