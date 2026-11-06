@@ -1,6 +1,6 @@
 import { ApiResponseOptions } from '@nestjs/swagger';
 
-export const getColorGroupNamesOkResponse: ApiResponseOptions = {
+export const getColorGroupsPaginatedOkResponse: ApiResponseOptions = {
   schema: {
     example: {
       page: 1,

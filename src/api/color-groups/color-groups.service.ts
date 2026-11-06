@@ -1,37 +1,69 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { mongo } from 'mongoose';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 
-import { COLOR_GROUPS_PER_PAGE, ColorGroupRepository } from '../../database/repositories';
-import { getItems, getTotalPages, hasNextPage, hasPreviousPage } from '../utils';
+import { getItems, getLimit, getPageInfo, getSkip } from '../../common/pagination';
+import { ColorGroupRepository, ColorRepository } from '../../database/repositories';
+import { COLOR_GROUPS_PER_PAGE } from '../common';
+import { isDuplicateKeyError } from '../utils';
 
-const DUPLICATE_KEY_ERROR = 11000;
+const nameTaken = (name: string) => new ConflictException(`Color group "${name}" already exists`);
+
+const groupNotFound = (id: number) => new NotFoundException(`Color group ${id} does not exist`);
+
+const rethrowDuplicateName = async <T>(name: string, operation: Promise<T>) => {
+  try {
+    return await operation;
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      throw nameTaken(name);
+    }
+
+    throw error;
+  }
+};
 
 @Injectable()
 export class ColorGroupsService {
-  constructor(private readonly colorGroupRepository: ColorGroupRepository) {}
+  constructor(
+    private readonly colorGroupRepository: ColorGroupRepository,
+    private readonly colorRepository: ColorRepository,
+  ) {}
 
-  async getColorGroupNames(page: number, name?: string) {
-    const filterName = name?.trim();
+  async getColorGroup(id?: number, name?: string) {
+    if ((id === undefined) === (name === undefined)) {
+      throw new BadRequestException('Send either id or name');
+    }
+
+    const group =
+      id === undefined
+        ? await this.colorGroupRepository.findGroupByName(name!)
+        : await this.colorGroupRepository.findGroupById(id);
+
+    return group ?? { message: id === undefined ? `Color group "${name}" not found` : `Color group ${id} not found` };
+  }
+
+  async getColorGroupsPaginated(page: number, name?: string) {
     const [groups, totalGroups] = await Promise.all([
-      this.colorGroupRepository.findGroupNames(filterName, page),
-      this.colorGroupRepository.countGroupNames(filterName),
+      this.colorGroupRepository.findGroupsPaginated(
+        name,
+        getSkip(page, COLOR_GROUPS_PER_PAGE),
+        getLimit(COLOR_GROUPS_PER_PAGE),
+      ),
+      this.colorGroupRepository.countGroups(name),
     ]);
 
     return {
       page,
-      totalPages: getTotalPages(totalGroups, COLOR_GROUPS_PER_PAGE),
-      hasNextPage: hasNextPage(groups, COLOR_GROUPS_PER_PAGE),
-      hasPreviousPage: hasPreviousPage(page),
+      ...getPageInfo(page, COLOR_GROUPS_PER_PAGE, groups, totalGroups),
       items: getItems(groups, COLOR_GROUPS_PER_PAGE),
     };
   }
 
-  async colorGroupExists(name: string) {
-    return { exists: await this.colorGroupRepository.existsByName(name) };
+  getColorGroupsNames() {
+    return this.colorGroupRepository.findGroupsNames();
   }
 
   async createColorGroup(name: string) {
-    if (await this.colorGroupRepository.existsByName(name)) {
+    if (await this.colorGroupRepository.findGroupByName(name)) {
       throw nameTaken(name);
     }
 
@@ -41,16 +73,16 @@ export class ColorGroupsService {
   }
 
   async updateColorGroup(id: number, name: string) {
-    const [groupExists, isNameTaken] = await Promise.all([
-      this.colorGroupRepository.existsById(id),
-      this.colorGroupRepository.existsByName(name, id),
+    const [group, groupWithName] = await Promise.all([
+      this.colorGroupRepository.findGroupById(id),
+      this.colorGroupRepository.findGroupByName(name),
     ]);
 
-    if (!groupExists) {
+    if (!group) {
       throw groupNotFound(id);
     }
 
-    if (isNameTaken) {
+    if (groupWithName && groupWithName._id !== id) {
       throw nameTaken(name);
     }
 
@@ -62,12 +94,12 @@ export class ColorGroupsService {
   }
 
   async deleteColorGroup(id: number) {
-    const [groupExists, colorsCount] = await Promise.all([
-      this.colorGroupRepository.existsById(id),
-      this.colorGroupRepository.countColorsInGroup(id),
+    const [group, colorsCount] = await Promise.all([
+      this.colorGroupRepository.findGroupById(id),
+      this.colorRepository.countColorsInGroup(id),
     ]);
 
-    if (!groupExists) {
+    if (!group) {
       throw groupNotFound(id);
     }
 
@@ -82,19 +114,3 @@ export class ColorGroupsService {
     return { message: 'ok' };
   }
 }
-
-const nameTaken = (name: string) => new ConflictException(`Color group "${name}" already exists`);
-
-const groupNotFound = (id: number) => new NotFoundException(`Color group ${id} does not exist`);
-
-const rethrowDuplicateName = async <T>(name: string, operation: Promise<T>) => {
-  try {
-    return await operation;
-  } catch (error) {
-    if (error instanceof mongo.MongoServerError && error.code === DUPLICATE_KEY_ERROR) {
-      throw nameTaken(name);
-    }
-
-    throw error;
-  }
-};

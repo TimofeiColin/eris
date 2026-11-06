@@ -7,7 +7,7 @@ export class Color {
   @Prop({ type: Number, required: true })
   _id!: number;
 
-  @Prop({ type: String, required: true, unique: true })
+  @Prop({ type: String, required: true })
   name!: string;
 
   @Prop({ type: String, required: true, uppercase: true, match: /^#[0-9A-F]{6}$/ })
@@ -18,3 +18,5 @@ export class Color {
 }
 
 export const ColorSchema = SchemaFactory.createForClass(Color);
+
+ColorSchema.index({ name: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } });

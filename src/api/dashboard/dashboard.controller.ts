@@ -1,17 +1,16 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { Controller, Get } from '@nestjs/common';
+import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 
-import { ApiKeyGuard } from '../guards/api-key.guard';
+import { ApiKeyAuth } from '../guards';
 import { getDashboardStatsOkResponse } from './api-responses';
 import { DashboardService } from './dashboard.service';
 
 @ApiTags('Dashboard')
 @Controller()
-@UseGuards(ApiKeyGuard)
+@ApiKeyAuth()
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
-  @ApiBearerAuth()
   @Get('dashboard-stats')
   @ApiOkResponse(getDashboardStatsOkResponse)
   getStats() {
