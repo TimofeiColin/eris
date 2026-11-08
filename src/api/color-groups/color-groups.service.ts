@@ -1,25 +1,21 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 
-import { getItems, getLimit, getPageInfo, getSkip } from '../../common/pagination';
 import { ColorGroupRepository, ColorRepository } from '../../database/repositories';
-import { COLOR_GROUPS_PER_PAGE } from '../common';
-import { isDuplicateKeyError } from '../utils';
+import {
+  alreadyExists,
+  COLOR_GROUPS_PER_PAGE,
+  getItems,
+  getLimit,
+  getPageInfo,
+  getSkip,
+  notFound,
+  requireIdOrName,
+  rethrowDuplicate,
+} from '../utils';
 
-const nameTaken = (name: string) => new ConflictException(`Color group "${name}" already exists`);
+const nameTaken = (name: string) => alreadyExists(`Color group "${name}"`);
 
-const groupNotFound = (id: number) => new NotFoundException(`Color group ${id} does not exist`);
-
-const rethrowDuplicateName = async <T>(name: string, operation: Promise<T>) => {
-  try {
-    return await operation;
-  } catch (error) {
-    if (isDuplicateKeyError(error)) {
-      throw nameTaken(name);
-    }
-
-    throw error;
-  }
-};
+const groupNotFound = (id: number) => notFound(`Color group ${id}`);
 
 @Injectable()
 export class ColorGroupsService {
@@ -29,16 +25,18 @@ export class ColorGroupsService {
   ) {}
 
   async getColorGroup(id?: number, name?: string) {
-    if ((id === undefined) === (name === undefined)) {
-      throw new BadRequestException('Send either id or name');
-    }
+    requireIdOrName(id, name);
 
     const group =
       id === undefined
         ? await this.colorGroupRepository.findGroupByName(name!)
         : await this.colorGroupRepository.findGroupById(id);
 
-    return group ?? { message: id === undefined ? `Color group "${name}" not found` : `Color group ${id} not found` };
+    if (!group) {
+      throw id === undefined ? notFound(`Color group "${name}"`) : groupNotFound(id);
+    }
+
+    return group;
   }
 
   async getColorGroupsPaginated(page: number, name?: string) {
@@ -67,7 +65,7 @@ export class ColorGroupsService {
       throw nameTaken(name);
     }
 
-    await rethrowDuplicateName(name, this.colorGroupRepository.createGroup(name));
+    await rethrowDuplicate(this.colorGroupRepository.createGroup(name), () => nameTaken(name));
 
     return { message: 'ok' };
   }
@@ -86,7 +84,7 @@ export class ColorGroupsService {
       throw nameTaken(name);
     }
 
-    if (!(await rethrowDuplicateName(name, this.colorGroupRepository.updateGroupName(id, name)))) {
+    if (!(await rethrowDuplicate(this.colorGroupRepository.updateGroupName(id, name), () => nameTaken(name)))) {
       throw groupNotFound(id);
     }
 

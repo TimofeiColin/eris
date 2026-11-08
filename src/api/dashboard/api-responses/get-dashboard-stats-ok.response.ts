@@ -5,7 +5,7 @@ export const getDashboardStatsOkResponse: ApiResponseOptions = {
     example: {
       colorGroups: 5,
       colors: 23,
-      sayings: 0,
+      responses: 3,
     },
   },
 };

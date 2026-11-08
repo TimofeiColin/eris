@@ -2,11 +2,12 @@ import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } fro
 import { ConfigService } from '@nestjs/config';
 import { Client, Events, GatewayIntentBits, Interaction, MessageFlags, RESTEvents } from 'discord.js';
 
-import { createErrorLogger } from '../../common/create-error-logger';
 import type { EnvConfig } from '../../env.validation';
 import { ColorService } from '../color/color.service';
 import { HelpService } from '../help/help.service';
 import { PingService } from '../ping/ping.service';
+import { ResponseService } from '../response/response.service';
+import { createErrorLogger } from '../utils';
 import { findRequiredBotChannel } from './bot-channel.guard';
 import { areCommandsRegistered, toCommandData } from './command-registration';
 import { DiscordCommand } from './discord-command';
@@ -19,7 +20,7 @@ export class DiscordService implements OnApplicationBootstrap, OnApplicationShut
   private readonly logError = createErrorLogger(this.logger);
 
   private readonly client = new Client({
-    intents: [GatewayIntentBits.Guilds],
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
     rest: { rejectOnRateLimit: ({ retryAfter }) => retryAfter > MAX_RATE_LIMIT_WAIT },
   });
 
@@ -30,6 +31,7 @@ export class DiscordService implements OnApplicationBootstrap, OnApplicationShut
     helpService: HelpService,
     pingService: PingService,
     colorService: ColorService,
+    private readonly responseService: ResponseService,
   ) {
     this.commands = [...helpService.commands, ...pingService.commands, ...colorService.commands];
   }
@@ -48,6 +50,10 @@ export class DiscordService implements OnApplicationBootstrap, OnApplicationShut
 
     this.client.on(Events.InteractionCreate, (interaction) => {
       this.handleInteraction(interaction).catch(this.logError);
+    });
+
+    this.client.on(Events.MessageCreate, (message) => {
+      this.responseService.handleMessage(message).catch(this.logError);
     });
 
     await this.client.login(this.config.getOrThrow('DISCORD_TOKEN', { infer: true }));

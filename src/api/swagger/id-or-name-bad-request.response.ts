@@ -1,6 +1,6 @@
 import { ApiResponseOptions } from '@nestjs/swagger';
 
-export const colorIdOrNameBadRequestResponse: ApiResponseOptions = {
+export const idOrNameBadRequestResponse: ApiResponseOptions = {
   schema: {
     example: { message: 'Send either id or name', error: 'Bad Request', statusCode: 400 },
   },

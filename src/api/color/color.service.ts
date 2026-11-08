@@ -1,28 +1,24 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
-import { getItems, getLimit, getPageInfo, getSkip } from '../../common/pagination';
 import { ColorGroupRepository, ColorRepository } from '../../database/repositories';
-import { COLORS_PER_PAGE } from '../common';
-import { isDuplicateKeyError } from '../utils';
+import {
+  alreadyExists,
+  COLORS_PER_PAGE,
+  getItems,
+  getLimit,
+  getPageInfo,
+  getSkip,
+  notFound,
+  requireIdOrName,
+  rethrowDuplicate,
+} from '../utils';
 import { CreateColorDto, UpdateColorDto } from './dto';
 
-const nameTaken = (name: string) => new ConflictException(`Color "${name}" already exists`);
+const nameTaken = (name: string) => alreadyExists(`Color "${name}"`);
 
-const colorNotFound = (id: number) => new NotFoundException(`Color ${id} does not exist`);
+const colorNotFound = (id: number) => notFound(`Color ${id}`);
 
-const groupNotFound = (id: number) => new NotFoundException(`Color group ${id} does not exist`);
-
-const rethrowDuplicateName = async <T>(name: string, operation: Promise<T>) => {
-  try {
-    return await operation;
-  } catch (error) {
-    if (isDuplicateKeyError(error)) {
-      throw nameTaken(name);
-    }
-
-    throw error;
-  }
-};
+const groupNotFound = (id: number) => notFound(`Color group ${id}`);
 
 @Injectable()
 export class ColorService {
@@ -32,16 +28,18 @@ export class ColorService {
   ) {}
 
   async getColor(id?: number, name?: string) {
-    if ((id === undefined) === (name === undefined)) {
-      throw new BadRequestException('Send either id or name');
-    }
+    requireIdOrName(id, name);
 
     const color =
       id === undefined
         ? await this.colorRepository.findColorByName(name!)
         : await this.colorRepository.findColorById(id);
 
-    return color ?? { message: id === undefined ? `Color "${name}" not found` : `Color ${id} not found` };
+    if (!color) {
+      throw id === undefined ? notFound(`Color "${name}"`) : colorNotFound(id);
+    }
+
+    return color;
   }
 
   async getColorsPaginated(page: number, name?: string, groupId?: number) {
@@ -89,7 +87,7 @@ export class ColorService {
       throw nameTaken(name);
     }
 
-    await rethrowDuplicateName(name, this.colorRepository.createColor({ name, hex, group: groupId }));
+    await rethrowDuplicate(this.colorRepository.createColor({ name, hex, group: groupId }), () => nameTaken(name));
 
     return { message: 'ok' };
   }
@@ -113,7 +111,11 @@ export class ColorService {
       throw nameTaken(name);
     }
 
-    if (!(await rethrowDuplicateName(name, this.colorRepository.updateColor(id, { name, hex, group: groupId })))) {
+    if (
+      !(await rethrowDuplicate(this.colorRepository.updateColor(id, { name, hex, group: groupId }), () =>
+        nameTaken(name),
+      ))
+    ) {
       throw colorNotFound(id);
     }
 

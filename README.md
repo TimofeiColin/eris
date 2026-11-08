@@ -1,6 +1,6 @@
 # Eris
 
-A Discord bot that lets server members choose their name color from 148 colors, grouped into 11 families. Built with NestJS and discord.js. It also runs an HTTP API for managing the colors, see [API](#api).
+A Discord bot that lets server members choose their name color from 148 colors, grouped into 11 families, and replies to chat messages with responses you set up, see [Bot responses](#bot-responses). Built with NestJS and discord.js. It also runs an HTTP API for managing the colors and bot responses, see [API](#api).
 
 ## Commands
 
@@ -27,17 +27,29 @@ The color commands only work in servers. All replies about colors are visible on
 
 ## Bot channel
 
-If the server has a text channel named `colors`, the bot only answers commands there and in its threads. Anywhere else, it replies privately and points to that channel. Without a `colors` channel, the bot works in every channel. You can change the channel name with `BOT_CHANNEL_NAME`, or turn the rule off by leaving it empty.
+If the server has a text channel named `colors`, the bot only answers slash commands there and in its threads. Anywhere else, it replies privately and points to that channel. Without a `colors` channel, the bot works in every channel. You can change the channel name with `BOT_CHANNEL_NAME`, or turn the rule off by leaving it empty. [Bot responses](#bot-responses) aren't limited by this rule.
+
+## Bot responses
+
+The bot reads messages in every channel it can see and replies when a message **ends with** one of the stored commands. Each command has a list of responses, and the bot picks one at random.
+
+- Matching ignores case and spaces around the message, so `Good Morning` matches `good morning`.
+- The command has to start a new word: `!!hi` and `well, hi` match `hi`, but `chi` doesn't.
+- When several commands match, the longest wins, so `!!hi there` uses `hi there`, not `hi`.
+- The message must end with the command, so `hello!` doesn't match `hello`.
+- The bot ignores other bots and itself, and never pings anyone from a response, even if it contains `@everyone`.
+
+Manage the commands and responses with the [API](#endpoints). `npm run seed` adds a few to start with. The bot keeps them in memory and reloads them whenever they change through the API, so edits take effect right away. Changes made directly in MongoDB or by a seed show up after the bot restarts.
 
 ## Setup
 
 Requires Node.js 22.12 or newer.
 
-1. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications) and copy its bot token.
-2. Invite the bot with the `bot` and `applications.commands` scopes and the **Manage Roles** permission:
+1. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications) and copy its bot token. On the **Bot** page, turn on **Message Content Intent**, which the bot needs to read messages for bot responses. Without it, the bot can't log in.
+2. Invite the bot with the `bot` and `applications.commands` scopes and the **Manage Roles**, **View Channels**, **Send Messages** and **Read Message History** permissions:
 
    ```
-   https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applications.commands&permissions=268435456
+   https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applications.commands&permissions=268504064
    ```
 
 3. Create your environment file and fill it in:
@@ -86,21 +98,25 @@ curl -H "Authorization: Bearer YOUR_API_KEY" http://localhost:3000/api/dashboard
 
 ### Endpoints
 
-| Endpoint                       | What it does                                                                                                                                                               |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/dashboard-stats`     | Number of color groups and colors                                                                                                                                          |
-| `GET /api/color-groups`        | Color groups with their `_id`, `name` and `colorsCount`, 6 per page. Query: `page` (1 to 100), `name`                                                                      |
-| `GET /api/color-groups-names`  | The `_id` and `name` of every color group, not paginated                                                                                                                   |
-| `GET /api/color-group`         | One group's `_id` and `name`. Query: either `id` or `name` (exact, any case). If none matches, `{ "message": "Color group … not found" }`                                  |
-| `POST /api/color-groups`       | Creates a group. Body: `{ "name": "Neon" }`. `409` if the name is taken, in any case                                                                                       |
-| `PATCH /api/color-groups/:id`  | Renames a group. Body: `{ "name": "Neon" }`. `409` if another group has that name, in any case                                                                             |
-| `DELETE /api/color-groups/:id` | Deletes a group. `409` while the group still has colors                                                                                                                    |
-| `GET /api/color`               | One color's `_id`, `name`, `hex` and `group`. Query: either `id` or `name` (exact, any case). If none matches, `{ "message": "Color … not found" }`                        |
-| `GET /api/colors`              | Colors with their `_id`, `name`, `hex`, `group` and `groupName`, 6 per page. Query: `page` (1 to 100), `name` (part of the name, any case), `groupId`                      |
-| `GET /api/colors-names`        | The `_id` and `name` of every color in a group. Query: `groupId`                                                                                                           |
-| `POST /api/colors`             | Creates a color. Body: `{ "name": "Neon Green", "hex": "#39FF14", "groupId": 4 }`, all required. `404` if the group doesn't exist, `409` if the name is taken, in any case |
-| `PATCH /api/colors/:id`        | Edits a color. Same body as create, all required. `409` if another color has that name, in any case                                                                        |
-| `DELETE /api/colors/:id`       | Deletes a color                                                                                                                                                            |
+| Endpoint                        | What it does                                                                                                                                                                         |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/dashboard-stats`      | Number of color groups, colors and bot responses                                                                                                                                     |
+| `GET /api/color-groups`         | Color groups with their `_id`, `name` and `colorsCount`, 6 per page. Query: `page` (1 to 100), `name`                                                                                |
+| `GET /api/color-groups-names`   | The `_id` and `name` of every color group, not paginated                                                                                                                             |
+| `GET /api/color-group`          | One group's `_id` and `name`. Query: either `id` or `name` (exact, any case). `404` if none matches                                                                                  |
+| `POST /api/color-groups`        | Creates a group. Body: `{ "name": "Neon" }`. `409` if the name is taken, in any case                                                                                                 |
+| `PATCH /api/color-groups/:id`   | Renames a group. Body: `{ "name": "Neon" }`. `409` if another group has that name, in any case                                                                                       |
+| `DELETE /api/color-groups/:id`  | Deletes a group. `409` while the group still has colors                                                                                                                              |
+| `GET /api/color`                | One color's `_id`, `name`, `hex` and `group`. Query: either `id` or `name` (exact, any case). `404` if none matches                                                                  |
+| `GET /api/colors`               | Colors with their `_id`, `name`, `hex`, `group` and `groupName`, 6 per page. Query: `page` (1 to 100), `name` (part of the name, any case), `groupId`                                |
+| `GET /api/colors-names`         | The `_id` and `name` of every color in a group. Query: `groupId`                                                                                                                     |
+| `POST /api/colors`              | Creates a color. Body: `{ "name": "Neon Green", "hex": "#39FF14", "groupId": 4 }`, all required. `404` if the group doesn't exist, `409` if the name is taken, in any case           |
+| `PATCH /api/colors/:id`         | Edits a color. Same body as create, all required. `409` if another color has that name, in any case                                                                                  |
+| `DELETE /api/colors/:id`        | Deletes a color                                                                                                                                                                      |
+| `GET /api/bot-responses`        | Bot responses with their `_id`, `command` and `responses`, 6 per page. Query: `page` (1 to 100), `command` and `response` (part of the text, any case)                               |
+| `POST /api/bot-responses`       | Creates a bot response. Returns the saved entry. Body: `{ "command": "good morning", "responses": ["Good morning! ☀️"] }`, both required. `409` if the command is taken, in any case |
+| `PATCH /api/bot-responses/:id`  | Edits a bot response. Returns the saved entry. Same body as create, both required. `409` if another entry has that command, in any case                                              |
+| `DELETE /api/bot-responses/:id` | Deletes a bot response                                                                                                                                                               |
 
 `name` on `GET /api/color-groups` matches part of a name in any case, so `re` finds Red and Green. Its response is paginated:
 
@@ -114,7 +130,7 @@ curl -H "Authorization: Bearer YOUR_API_KEY" http://localhost:3000/api/dashboard
 }
 ```
 
-Creating returns `201` and editing or deleting returns `200`, all with `{ "message": "ok" }`. Invalid input returns `400` with what's wrong. An unknown group or color id returns `404`, except on `GET /api/color-group` and `GET /api/color`, which return a `"… not found"` message instead.
+Creating returns `201` and editing or deleting returns `200`, all with `{ "message": "ok" }`, except creating and editing bot responses, which return the saved entry. Invalid input returns `400` with what's wrong. A group or color that doesn't exist returns `404`.
 
 Group names and color names are unique in any case, so `Red` and `red` can't both exist. The database enforces this too. Color names can be up to 90 characters, so they still fit in a Discord role name with the `Color ` prefix, and hex codes are saved in uppercase.
 
@@ -135,14 +151,14 @@ Browser apps on other origins can call the API, because CORS is enabled for all 
 
 Migrations and seeds are run with [umzug](https://github.com/sequelize/umzug). Indexes are created by migrations only, so the bot doesn't build them on startup. Each one runs only once: the database records what has run in the `migrations` and `seeds` collections.
 
-| Command                | What it does                                                              |
-| ---------------------- | ------------------------------------------------------------------------- |
-| `npm run migrate`      | Runs pending migrations                                                   |
-| `npm run migrate:down` | Undoes the last migration                                                 |
-| `npm run seed`         | Runs pending migrations, then pending seeds (the color groups and colors) |
-| `npm run seed:down`    | Undoes the last seed                                                      |
+| Command                | What it does                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------ |
+| `npm run migrate`      | Runs pending migrations                                                                          |
+| `npm run migrate:down` | Undoes the last migration                                                                        |
+| `npm run seed`         | Runs pending migrations, then pending seeds (the color groups, colors and starter bot responses) |
+| `npm run seed:down`    | Undoes the last seed                                                                             |
 
-After pulling changes, run `npm run migrate` so existing databases get new migrations. Migrations 002 and 003 make group and color names unique in any case.
+After pulling changes, run `npm run migrate` so existing databases get new migrations. Migrations 002 and 003 make group and color names unique in any case, and 004 creates the `bot_responses` collection.
 
 To add one, create a file in `src/database/migrations/` or `src/database/seeds/` and add it to the list in that folder's `index.ts`. These commands need the dev dependencies. From a built copy, such as the Docker image, run `node dist/database/cli seed` instead.
 
@@ -183,19 +199,21 @@ npm run lint
 npm run format
 ```
 
-| Folder            | Contents                                                                                                                        |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `src/bot/discord` | Discord connection, command registration, routing and the #colors channel rule                                                  |
-| `src/bot/color`   | The color commands and menu, with `render/` for images and menu layout, `helpers/` for role names and `types/` for shared types |
-| `src/bot/ping`    | `/ping`                                                                                                                         |
-| `src/bot/help`    | `/help`                                                                                                                         |
-| `src/api`         | The HTTP API, one folder per area with its controller, service, `dto/` for inputs and `api-responses/` for its Swagger examples |
-| `src/api/swagger` | Swagger examples used by more than one area, like `{ "message": "ok" }`                                                         |
-| `src/api/common`  | Shared API settings, like page sizes                                                                                            |
-| `src/api/guards`  | The API key guard and the `@ApiKeyAuth()` decorator that adds it to a controller                                                |
-| `src/api/utils`   | Input helpers for DTOs, like `trimString`, `toNumber` and the `@IsHex()` check                                                  |
-| `src/database`    | MongoDB connection, schemas, repositories, migrations and seeds                                                                 |
-| `src/common`      | Small shared helpers, including pagination for the API and anything else that pages results                                     |
+| Folder             | Contents                                                                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `src/bot/discord`  | Discord connection, command registration, routing and the #colors channel rule                                                    |
+| `src/bot/color`    | The color commands and menu, with `render/` for images and menu layout, `helpers/` for role names and `types/` for shared types   |
+| `src/bot/ping`     | `/ping`                                                                                                                           |
+| `src/bot/help`     | `/help`                                                                                                                           |
+| `src/bot/response` | Replies to messages that end with a stored command                                                                                |
+| `src/api`          | The HTTP API, one folder per area with its controller, service, `dto/` for inputs and `api-responses/` for its Swagger examples   |
+| `src/api/swagger`  | Swagger examples used by more than one area, like `{ "message": "ok" }`                                                           |
+| `src/api/guards`   | The API key guard and the `@ApiKeyAuth()` decorator that adds it to a controller                                                  |
+| `src/api/dto`      | Base DTOs shared by the API areas: `PaginationQueryDto` and `IdOrNameQueryDto`                                                    |
+| `src/api/utils`    | Shared API code: pagination helpers and page sizes, error helpers, and input helpers like `trimString`, `toNumber` and `@IsHex()` |
+| `src/database`     | MongoDB connection, schemas, repositories, migrations and seeds, with `utils/` for query helpers like `escapeRegex`               |
+| `src/cache`        | In-memory cache of bot responses, reloaded when they change                                                                       |
+| `src/bot/utils`    | Small helpers for the bot, like the error logger                                                                                  |
 
 Each feature service lists its own commands in a `commands` array, pairing each definition with its handler. To add a command, add an entry there, and register the service in `DiscordService` if it's new. `/help` picks it up automatically.
 

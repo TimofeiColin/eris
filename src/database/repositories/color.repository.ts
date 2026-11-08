@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
-import { escapeRegex } from '../../common/escape-regex';
 import { Color } from '../schemas/color.schema';
 import { ColorGroup } from '../schemas/color-group.schema';
+import { escapeRegex } from '../utils';
 
 const colorsFilter = (name?: string, groupId?: number) => ({
   ...(name ? { name: { $regex: escapeRegex(name), $options: 'i' } } : {}),
