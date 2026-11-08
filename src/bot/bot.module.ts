@@ -4,8 +4,9 @@ import { ColorModule } from './color/color.module';
 import { DiscordModule } from './discord/discord.module';
 import { HelpModule } from './help/help.module';
 import { PingModule } from './ping/ping.module';
+import { ResponseModule } from './response/response.module';
 
 @Module({
-  imports: [ColorModule, DiscordModule, HelpModule, PingModule],
+  imports: [ColorModule, DiscordModule, HelpModule, PingModule, ResponseModule],
 })
 export class BotModule {}

@@ -9,10 +9,9 @@ import {
 } from '@nestjs/swagger';
 
 import { ApiKeyAuth } from '../guards';
-import { okResponse } from '../swagger';
+import { idOrNameBadRequestResponse, okResponse } from '../swagger';
 import {
   colorGroupNotFoundResponse,
-  colorIdOrNameBadRequestResponse,
   colorNameConflictResponse,
   colorNotFoundResponse,
   getColorNamesOkResponse,
@@ -30,7 +29,8 @@ export class ColorController {
 
   @Get('color')
   @ApiOkResponse(getColorOkResponse)
-  @ApiBadRequestResponse(colorIdOrNameBadRequestResponse)
+  @ApiBadRequestResponse(idOrNameBadRequestResponse)
+  @ApiNotFoundResponse(colorNotFoundResponse)
   getColor(@Query() query: GetColorQueryDto) {
     return this.colorService.getColor(query.id, query.name);
   }

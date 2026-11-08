@@ -1,5 +1,4 @@
 export * from './color-group-has-colors-conflict.response';
-export * from './color-group-id-or-name-bad-request.response';
 export * from './color-group-name-conflict.response';
 export * from './color-group-not-found.response';
 export * from './get-color-group-ok.response';

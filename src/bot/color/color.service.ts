@@ -7,9 +7,9 @@ import {
   MessageFlags,
 } from 'discord.js';
 
-import { createErrorLogger } from '../../common/create-error-logger';
 import type { EnvConfig } from '../../env.validation';
 import { createSlashCommand, DiscordCommand } from '../discord/discord-command';
+import { createErrorLogger } from '../utils';
 import { ColorCatalogService } from './color-catalog.service';
 import { ColorRoleService } from './color-role.service';
 import { getPageCount, renderGroupPage, renderIntro } from './render';

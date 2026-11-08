@@ -1,10 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsInt, IsOptional, IsString, Min } from 'class-validator';
 
+import { PaginationQueryDto } from '../../dto';
 import { toNumber, trimString } from '../../utils';
 
-export class GetColorsQueryDto {
+export class GetColorsQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({
     description: 'Case-insensitive part of the color name',
     example: 'red',
@@ -23,18 +24,4 @@ export class GetColorsQueryDto {
   @Min(1)
   @IsInt()
   groupId?: number;
-
-  @ApiPropertyOptional({
-    description: 'Page number, from 1 to 100',
-    example: 1,
-    default: 1,
-    minimum: 1,
-    maximum: 100,
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @Max(100)
-  @Min(1)
-  @IsInt()
-  page: number = 1;
 }
