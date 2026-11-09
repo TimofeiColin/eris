@@ -12,7 +12,7 @@ async function bootstrap() {
   app.enableShutdownHooks();
   app.enableCors();
 
-  app.setGlobalPrefix(env.API_PREFIX);
+  app.setGlobalPrefix(env.API_PREFIX, { exclude: ['mcp'] });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, stopAtFirstError: true }));
 
   if (process.env.NODE_ENV === 'development') {

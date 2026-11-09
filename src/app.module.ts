@@ -6,6 +6,7 @@ import { BotModule } from './bot/bot.module';
 import { CacheModule } from './cache/cache.module';
 import { DatabaseModule } from './database/database.module';
 import { validateEnv } from './env.validation';
+import { McpModule } from './mcp/mcp.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { validateEnv } from './env.validation';
     CacheModule,
     BotModule,
     ApiModule,
+    McpModule,
   ],
 })
 export class AppModule {}

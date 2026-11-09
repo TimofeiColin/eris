@@ -8,5 +8,6 @@ import { BotResponsesService } from './bot-responses.service';
   imports: [DatabaseModule],
   controllers: [BotResponsesController],
   providers: [BotResponsesService],
+  exports: [BotResponsesService],
 })
 export class BotResponsesModule {}
