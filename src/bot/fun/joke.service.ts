@@ -1,13 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Message } from 'discord.js';
 
-import { BatchQueue, fetchJson, isCommandMessage } from '../utils';
-
-const JOKE_COMMAND = '!!!joke';
-
-const JOKE_API_URL = 'https://v2.jokeapi.dev/joke/Any?type=single&safe-mode&amount=10';
-
-const MESSAGE_LIMIT = 2000;
+import { BatchQueue, fetchJson } from '../utils';
+import { FunCommand } from './fun-command';
 
 interface Joke {
   joke: string;
@@ -15,16 +10,20 @@ interface Joke {
 }
 
 @Injectable()
-export class JokeService {
+export class JokeService implements FunCommand {
+  readonly command = '!!!joke';
+
+  readonly description = 'A random one-line joke';
+
+  private readonly apiUrl = 'https://v2.jokeapi.dev/joke/Any?type=single&safe-mode&amount=10';
+
+  private readonly messageLimit = 2000;
+
   private readonly logger = new Logger(JokeService.name);
 
   private readonly jokes = new BatchQueue(() => this.fetchJokes());
 
-  async handleMessage(message: Message) {
-    if (!isCommandMessage(message, JOKE_COMMAND)) {
-      return;
-    }
-
+  async reply(message: Message) {
     let joke: string;
 
     try {
@@ -38,11 +37,11 @@ export class JokeService {
   }
 
   private async fetchJokes() {
-    const { jokes } = await fetchJson<{ jokes?: Joke[] }>(JOKE_API_URL);
+    const { jokes } = await fetchJson<{ jokes?: Joke[] }>(this.apiUrl);
     const texts = (jokes ?? [])
       .filter((joke) => joke?.safe && typeof joke.joke === 'string')
       .map((joke) => joke.joke.trim())
-      .filter((joke) => joke && joke.length <= MESSAGE_LIMIT);
+      .filter((joke) => joke && joke.length <= this.messageLimit);
 
     if (!texts.length) {
       throw new Error('JokeAPI returned no jokes');
