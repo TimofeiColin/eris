@@ -45,6 +45,10 @@ Use `/responses` to see the commands in Discord, and manage them with the [API](
 
 Send `!!!neko` as its own message, in any case, and the bot replies with a random neko picture from [nekos.best](https://nekos.best). It gets 20 pictures per request and uses them one by one, so it stays well under the API limit of 200 requests a minute. If the image can't be uploaded, the embed links to it instead, and if nekos.best can't be reached, the bot says to try again later.
 
+## Joke
+
+Send `!!!joke` as its own message, in any case, and the bot replies with a one-line joke from [JokeAPI](https://v2.jokeapi.dev). It uses safe mode, so jokes flagged as NSFW, religious, political, racist, sexist or explicit are left out. It gets 10 jokes per request and uses them one by one, staying well under the API limit of 120 requests a minute. If JokeAPI can't be reached, the bot says to try again later.
+
 ## Setup
 
 Requires Node.js 22.12 or newer.
