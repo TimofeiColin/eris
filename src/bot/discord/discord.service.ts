@@ -5,6 +5,7 @@ import { Client, Events, GatewayIntentBits, Interaction, MessageFlags, RESTEvent
 import type { EnvConfig } from '../../env.validation';
 import { ColorService } from '../color/color.service';
 import { HelpService } from '../help/help.service';
+import { NekoService } from '../neko/neko.service';
 import { PingService } from '../ping/ping.service';
 import { ResponseService } from '../response/response.service';
 import { createErrorLogger } from '../utils';
@@ -32,6 +33,7 @@ export class DiscordService implements OnApplicationBootstrap, OnApplicationShut
     pingService: PingService,
     colorService: ColorService,
     private readonly responseService: ResponseService,
+    private readonly nekoService: NekoService,
   ) {
     this.commands = [
       ...helpService.commands,
@@ -59,6 +61,7 @@ export class DiscordService implements OnApplicationBootstrap, OnApplicationShut
 
     this.client.on(Events.MessageCreate, (message) => {
       this.responseService.handleMessage(message).catch(this.logError);
+      this.nekoService.handleMessage(message).catch(this.logError);
     });
 
     await this.client.login(this.config.getOrThrow('DISCORD_TOKEN', { infer: true }));
