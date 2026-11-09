@@ -5,7 +5,7 @@ import { CacheService } from '../../cache/cache.service';
 import { BotResponse } from '../../database/schemas/bot-response.schema';
 import { createSlashCommand, DiscordCommand } from '../discord/discord-command';
 
-const WORD_CHARACTER = /[\p{L}\p{N}]/u;
+const RESPONSE_PREFIX = '!!';
 
 const RESPONSES_COLOR = 0x5865f2;
 
@@ -42,13 +42,13 @@ export class ResponseService {
     const botResponses = (await this.cacheService.getBotResponses()).sort((a, b) => a.command.localeCompare(b.command));
     const lines = botResponses.map(
       ({ command, responses }) =>
-        `**${command}** — ${responses.length} ${responses.length === 1 ? 'reply' : 'replies'}`,
+        `**${RESPONSE_PREFIX}${command}** — ${responses.length} ${responses.length === 1 ? 'reply' : 'replies'}`,
     );
 
     const embed = new EmbedBuilder()
       .setTitle('💬 Responses')
       .setDescription(lines.length ? this.fitLines(lines) : 'No responses yet.')
-      .setFooter({ text: 'End a message with one of these and I will reply' })
+      .setFooter({ text: 'Send one of these as its own message and I will reply' })
       .setColor(RESPONSES_COLOR);
 
     await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
@@ -73,30 +73,17 @@ export class ResponseService {
 
   private findBotResponse(content: string, botResponses: BotResponse[]) {
     const text = this.normalize(content);
-    let match: BotResponse | undefined;
-    let matchLength = 0;
 
-    for (const botResponse of botResponses) {
-      const command = this.normalize(botResponse.command);
-
-      if (
-        command.length > matchLength &&
-        text.endsWith(command) &&
-        this.startsAtWordBoundary(text, text.length - command.length)
-      ) {
-        match = botResponse;
-        matchLength = command.length;
-      }
+    if (!text.startsWith(RESPONSE_PREFIX)) {
+      return;
     }
 
-    return match;
+    const command = this.normalize(text.slice(RESPONSE_PREFIX.length));
+
+    return botResponses.find((botResponse) => this.normalize(botResponse.command) === command);
   }
 
   private normalize(text: string) {
     return text.trim().toLowerCase();
-  }
-
-  private startsAtWordBoundary(text: string, index: number) {
-    return index === 0 || !WORD_CHARACTER.test(text[index - 1]);
   }
 }

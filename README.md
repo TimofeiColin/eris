@@ -32,12 +32,10 @@ If the server has a text channel named `colors`, the bot only answers slash comm
 
 ## Bot responses
 
-The bot reads messages in every channel it can see and replies when a message **ends with** one of the stored commands. Each command has a list of responses, and the bot picks one at random.
+The bot reads messages in every channel it can see and replies when a whole message is `!!` followed by one of the stored commands, like `!!good morning`. Each command has a list of responses, and the bot picks one at random.
 
-- Matching ignores case and spaces around the message, so `Good Morning` matches `good morning`.
-- The command has to start a new word: `!!hi` and `well, hi` match `hi`, but `chi` doesn't.
-- When several commands match, the longest wins, so `!!hi there` uses `hi there`, not `hi`.
-- The message must end with the command, so `hello!` doesn't match `hello`.
+- Matching ignores case and spaces around the message, so `!!Good Morning` matches `good morning`.
+- The message must be only `!!` and the command: `!!hi` matches `hi`, and so does `!! hi`, but `hi`, `!!!hi`, `well, !!hi`, `!!I said hi` and `!!hi!` don't.
 - The bot ignores other bots and itself, and never pings anyone from a response, even if it contains `@everyone`.
 
 Use `/responses` to see the commands in Discord, and manage them with the [API](#endpoints) or the [MCP](#mcp) tools. `npm run seed` adds a few to start with. The bot keeps them in memory and reloads them whenever they change through the API, so edits take effect right away. Changes made directly in MongoDB or by a seed show up after the bot restarts.
