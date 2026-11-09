@@ -10,6 +10,7 @@ A Discord bot that lets server members choose their name color from 148 colors, 
 | `/color-create` | Browse the colors and create roles for them, without assigning them             |
 | `/color-reset`  | Remove all of your color roles                                                  |
 | `/help`         | Show all available commands                                                     |
+| `/responses`    | Show the messages the bot replies to                                            |
 | `/ping`         | Check that the bot is responding                                                |
 
 The color commands only work in servers. All replies about colors are visible only to the person who used the command.
@@ -39,7 +40,7 @@ The bot reads messages in every channel it can see and replies when a message **
 - The message must end with the command, so `hello!` doesn't match `hello`.
 - The bot ignores other bots and itself, and never pings anyone from a response, even if it contains `@everyone`.
 
-Manage the commands and responses with the [API](#endpoints). `npm run seed` adds a few to start with. The bot keeps them in memory and reloads them whenever they change through the API, so edits take effect right away. Changes made directly in MongoDB or by a seed show up after the bot restarts.
+Use `/responses` to see the commands in Discord, and manage them with the [API](#endpoints) or the [MCP](#mcp) tools. `npm run seed` adds a few to start with. The bot keeps them in memory and reloads them whenever they change through the API, so edits take effect right away. Changes made directly in MongoDB or by a seed show up after the bot restarts.
 
 ## Setup
 
@@ -138,6 +139,29 @@ Renaming or deleting a color through the API doesn't touch Discord. Members keep
 
 Browser apps on other origins can call the API, because CORS is enabled for all origins. The API key still protects every route.
 
+## MCP
+
+Eris also runs an [MCP](https://modelcontextprotocol.io) server, so AI assistants and other MCP clients can read and add bot responses. It's at `http://localhost:3000/mcp` (outside `API_PREFIX`), uses the Streamable HTTP transport, and needs the same `API_KEY` as a Bearer token.
+
+| Tool                   | What it does                                                                                                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_bot_responses`    | Lists every bot response as `{ "id", "command", "replies" }`. Read only                                                                                             |
+| `create_bot_responses` | Creates bot responses from a list of `{ "command", "replies" }`. Commands that already exist, in any case, are skipped and reported, and the rest are still created |
+
+For a client that's configured with a JSON file, the entry looks like this:
+
+```json
+{
+  "mcpServers": {
+    "eris": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp",
+      "headers": { "Authorization": "Bearer YOUR_API_KEY" }
+    }
+  }
+}
+```
+
 ## Roles
 
 - Color roles are named `Color` plus the color, like `Color Red`, and are created the first time someone picks that color. They have no permissions.
@@ -213,6 +237,7 @@ npm run format
 | `src/api/utils`    | Shared API code: pagination helpers and page sizes, error helpers, and input helpers like `trimString`, `toNumber` and `@IsHex()` |
 | `src/database`     | MongoDB connection, schemas, repositories, migrations and seeds, with `utils/` for query helpers like `escapeRegex`               |
 | `src/cache`        | In-memory cache of bot responses, reloaded when they change                                                                       |
+| `src/mcp`          | The MCP server, with one folder per area for its tools, like `bot-responses/`                                                     |
 | `src/bot/utils`    | Small helpers for the bot, like the error logger                                                                                  |
 
 Each feature service lists its own commands in a `commands` array, pairing each definition with its handler. To add a command, add an entry there, and register the service in `DiscordService` if it's new. `/help` picks it up automatically.

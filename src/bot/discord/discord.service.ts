@@ -33,7 +33,12 @@ export class DiscordService implements OnApplicationBootstrap, OnApplicationShut
     colorService: ColorService,
     private readonly responseService: ResponseService,
   ) {
-    this.commands = [...helpService.commands, ...pingService.commands, ...colorService.commands];
+    this.commands = [
+      ...helpService.commands,
+      ...pingService.commands,
+      ...colorService.commands,
+      ...responseService.commands,
+    ];
   }
 
   async onApplicationBootstrap() {
