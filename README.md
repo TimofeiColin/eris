@@ -41,6 +41,10 @@ The bot reads messages in every channel it can see and replies when a whole mess
 
 Use `/responses` to see the commands in Discord, and manage them with the [API](#endpoints) or the [MCP](#mcp) tools. `npm run seed` adds a few to start with. The bot keeps them in memory and reloads them whenever they change through the API, so edits take effect right away. Changes made directly in MongoDB or by a seed show up after the bot restarts.
 
+## Neko
+
+Send `!!!neko` as its own message, in any case, and the bot replies with a random neko picture from [nekos.best](https://nekos.best). It gets 20 pictures per request and uses them one by one, so it stays well under the API limit of 200 requests a minute. If the image can't be uploaded, the embed links to it instead, and if nekos.best can't be reached, the bot says to try again later.
+
 ## Setup
 
 Requires Node.js 22.12 or newer.
