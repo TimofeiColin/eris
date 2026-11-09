@@ -11,6 +11,7 @@ A Discord bot that lets server members choose their name color from 148 colors, 
 | `/color-reset`  | Remove all of your color roles                                                  |
 | `/help`         | Show all available commands                                                     |
 | `/responses`    | Show the messages the bot replies to                                            |
+| `/fun`          | Show the fun commands                                                           |
 | `/ping`         | Check that the bot is responding                                                |
 
 The color commands only work in servers. All replies about colors are visible only to the person who used the command.
@@ -41,13 +42,17 @@ The bot reads messages in every channel it can see and replies when a whole mess
 
 Use `/responses` to see the commands in Discord, and manage them with the [API](#endpoints) or the [MCP](#mcp) tools. `npm run seed` adds a few to start with. The bot keeps them in memory and reloads them whenever they change through the API, so edits take effect right away. Changes made directly in MongoDB or by a seed show up after the bot restarts.
 
-## Neko
+## Fun commands
 
-Send `!!!neko` as its own message, in any case, and the bot replies with a random neko picture from [nekos.best](https://nekos.best). It gets 20 pictures per request and uses them one by one, so it stays well under the API limit of 200 requests a minute. If the image can't be uploaded, the embed links to it instead, and if nekos.best can't be reached, the bot says to try again later.
+Send one of these as its own message, in any case, and the bot replies in that channel:
 
-## Joke
+| Message      | Reply                                                                                               | Source                                        | API limit      |
+| ------------ | --------------------------------------------------------------------------------------------------- | --------------------------------------------- | -------------- |
+| `!!!neko`    | A random neko picture, uploaded in an embed                                                         | [nekos.best](https://nekos.best)              | 200 a minute   |
+| `!!!joke`    | A one-line joke. Safe mode leaves out NSFW, religious, political, racist, sexist and explicit jokes | [JokeAPI](https://v2.jokeapi.dev)             | 120 a minute   |
+| `!!!funfact` | A random fun fact                                                                                   | [Useless Facts](https://uselessfacts.jsph.pl) | None published |
 
-Send `!!!joke` as its own message, in any case, and the bot replies with a one-line joke from [JokeAPI](https://v2.jokeapi.dev). It uses safe mode, so jokes flagged as NSFW, religious, political, racist, sexist or explicit are left out. It gets 10 jokes per request and uses them one by one, staying well under the API limit of 120 requests a minute. If JokeAPI can't be reached, the bot says to try again later.
+The bot fetches nekos 20 at a time and jokes 10 at a time and uses them one by one, so it stays well under the limits. Fun facts are fetched one per message, since that API has no batches. If a source can't be reached, the bot says to try again later. These live in `src/bot/fun`: `FunService` gets every message and passes it to the service whose command matches.
 
 ## Setup
 
@@ -236,7 +241,8 @@ npm run format
 | `src/bot/color`    | The color commands and menu, with `render/` for images and menu layout, `helpers/` for role names and `types/` for shared types   |
 | `src/bot/ping`     | `/ping`                                                                                                                           |
 | `src/bot/help`     | `/help`                                                                                                                           |
-| `src/bot/response` | Replies to messages that end with a stored command                                                                                |
+| `src/bot/response` | Replies to `!!` plus a stored command                                                                                             |
+| `src/bot/fun`      | `!!!neko`, `!!!joke` and `!!!funfact`, routed by `FunService`                                                                     |
 | `src/api`          | The HTTP API, one folder per area with its controller, service, `dto/` for inputs and `api-responses/` for its Swagger examples   |
 | `src/api/swagger`  | Swagger examples used by more than one area, like `{ "message": "ok" }`                                                           |
 | `src/api/guards`   | The API key guard and the `@ApiKeyAuth()` decorator that adds it to a controller                                                  |
