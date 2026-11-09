@@ -1,15 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EmbedBuilder, Message } from 'discord.js';
 
-import { downloadImage } from '../utils';
+import { BatchQueue, downloadImage, fetchJson, isCommandMessage } from '../utils';
 
 const NEKO_COMMAND = '!!!neko';
 
 const NEKO_API_URL = 'https://nekos.best/api/v2/neko?amount=20';
 
 const NEKO_COLOR = 0xf5a9b8;
-
-const REQUEST_TIMEOUT = 10_000;
 
 interface Neko {
   url: string;
@@ -19,19 +17,17 @@ interface Neko {
 export class NekoService {
   private readonly logger = new Logger(NekoService.name);
 
-  private nekos: Neko[] = [];
-
-  private nekosLoading: Promise<Neko[]> | null = null;
+  private readonly nekos = new BatchQueue(() => this.fetchNekos());
 
   async handleMessage(message: Message) {
-    if (message.author.bot || !message.inGuild() || message.content.trim().toLowerCase() !== NEKO_COMMAND) {
+    if (!isCommandMessage(message, NEKO_COMMAND)) {
       return;
     }
 
     let neko: Neko;
 
     try {
-      neko = await this.takeNeko();
+      neko = await this.nekos.take();
     } catch (error) {
       this.logger.warn(`Could not get a neko: ${(error as Error).message}`);
       await message.reply({ content: 'No nekos right now, try again in a minute 🐾', allowedMentions: { parse: [] } });
@@ -55,25 +51,8 @@ export class NekoService {
     }
   }
 
-  private async takeNeko() {
-    while (!this.nekos.length) {
-      this.nekos = await (this.nekosLoading ??= this.fetchNekos().finally(() => (this.nekosLoading = null)));
-    }
-
-    return this.nekos.shift()!;
-  }
-
   private async fetchNekos() {
-    const response = await fetch(NEKO_API_URL, {
-      headers: { 'User-Agent': 'Eris Discord bot' },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT),
-    });
-
-    if (!response.ok) {
-      throw new Error(`nekos.best answered with status ${response.status}`);
-    }
-
-    const { results } = (await response.json()) as { results?: Neko[] };
+    const { results } = await fetchJson<{ results?: Neko[] }>(NEKO_API_URL);
     const nekos = (results ?? []).filter((neko) => typeof neko?.url === 'string');
 
     if (!nekos.length) {
