@@ -36,6 +36,7 @@ The bot reads messages in every channel it can see and replies when a whole mess
 
 - Matching ignores case and spaces around the message, so `!!Good Morning` matches `good morning`.
 - The message must be only `!!` and the command: `!!hi` matches `hi`, and so does `!! hi`, but `hi`, `!!!hi`, `well, !!hi`, `!!I said hi` and `!!hi!` don't.
+- A response that is only an `https` link to a `.png`, `.jpg`, `.gif` or `.webp` image is downloaded and uploaded as an image, up to 10 MB, so it shows even when Discord doesn't preview the link. If the download fails, the bot sends the link. The bot needs the Attach Files permission for this.
 - The bot ignores other bots and itself, and never pings anyone from a response, even if it contains `@everyone`.
 
 Use `/responses` to see the commands in Discord, and manage them with the [API](#endpoints) or the [MCP](#mcp) tools. `npm run seed` adds a few to start with. The bot keeps them in memory and reloads them whenever they change through the API, so edits take effect right away. Changes made directly in MongoDB or by a seed show up after the bot restarts.
