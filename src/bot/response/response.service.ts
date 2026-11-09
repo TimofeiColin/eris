@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ChatInputCommandInteraction, EmbedBuilder, Message, MessageFlags } from 'discord.js';
 
 import { CacheService } from '../../cache/cache.service';
 import { BotResponse } from '../../database/schemas/bot-response.schema';
 import { createSlashCommand, DiscordCommand } from '../discord/discord-command';
+import { downloadImage, isImageUrl } from '../utils';
 
 const RESPONSE_PREFIX = '!!';
 
@@ -13,6 +14,8 @@ const EMBED_DESCRIPTION_LIMIT = 4096;
 
 @Injectable()
 export class ResponseService {
+  private readonly logger = new Logger(ResponseService.name);
+
   readonly commands: DiscordCommand[] = [
     {
       data: createSlashCommand().setName('responses').setDescription('Show the messages the bot replies to'),
@@ -33,9 +36,23 @@ export class ResponseService {
       return;
     }
 
-    const reply = botResponse.responses[Math.floor(Math.random() * botResponse.responses.length)];
+    const reply = botResponse.responses[Math.floor(Math.random() * botResponse.responses.length)].trim();
 
-    await message.reply({ content: reply, allowedMentions: { parse: [] } });
+    await message.reply({ ...(await this.createReply(reply)), allowedMentions: { parse: [] } });
+  }
+
+  private async createReply(reply: string) {
+    if (!isImageUrl(reply)) {
+      return { content: reply };
+    }
+
+    try {
+      return { files: [await downloadImage(reply)] };
+    } catch (error) {
+      this.logger.warn(`Sending the link instead: ${(error as Error).message}`);
+
+      return { content: reply };
+    }
   }
 
   private async listResponses(interaction: ChatInputCommandInteraction) {
